@@ -13,6 +13,7 @@ export type Animal = {
   reasonForEntry: string;
   exitDate?: string;
   reasonForExit?: string;
+  ownerId?: string;
 };
 
 export type User = {
@@ -31,6 +32,7 @@ export type FinancialRecord = {
   category: string;
   amount: number;
   description: string;
+  ownerId?: string;
 };
 
 export type MilkRecord = {

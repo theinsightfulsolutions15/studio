@@ -1,3 +1,5 @@
+'use client';
+
 import {
   Card,
   CardContent,
@@ -23,11 +25,35 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { placeholderAnimals } from '@/lib/placeholder-data';
 import { MoreHorizontal, PlusCircle, Search } from 'lucide-react';
 import Image from 'next/image';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import type { Animal } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
+
+function AnimalRowSkeleton() {
+  return (
+    <TableRow>
+      <TableCell className="hidden sm:table-cell">
+        <Skeleton className="h-16 w-16 rounded-md" />
+      </TableCell>
+      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+      <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+      <TableCell>
+        <Skeleton className="h-8 w-8 rounded-md" />
+      </TableCell>
+    </TableRow>
+  );
+}
 
 export default function AnimalsPage() {
+  const firestore = useFirestore();
+  const animalsCollection = useMemoFirebase(() => collection(firestore, 'animals'), [firestore]);
+  const { data: animals, isLoading } = useCollection<Animal>(animalsCollection);
+
   return (
     <Card>
       <CardHeader>
@@ -63,14 +89,15 @@ export default function AnimalsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {placeholderAnimals.map((animal) => (
+            {isLoading && Array.from({ length: 5 }).map((_, i) => <AnimalRowSkeleton key={i} />)}
+            {animals?.map((animal) => (
               <TableRow key={animal.id}>
                 <TableCell className="hidden sm:table-cell">
                   <Image
                     alt="Animal image"
                     className="aspect-square rounded-md object-cover"
                     height="64"
-                    src={animal.imageUrl}
+                    src={animal.imageUrl || "https://picsum.photos/seed/placeholder/64/64"}
                     width="64"
                     data-ai-hint={animal.imageHint}
                   />
@@ -105,7 +132,7 @@ export default function AnimalsPage() {
       </CardContent>
        <CardFooter>
         <div className="text-xs text-muted-foreground">
-          Showing <strong>1-5</strong> of <strong>{placeholderAnimals.length}</strong> animals
+          Showing <strong>1-{animals?.length ?? 0}</strong> of <strong>{animals?.length ?? 0}</strong> animals
         </div>
       </CardFooter>
     </Card>
