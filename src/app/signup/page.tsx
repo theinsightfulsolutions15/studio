@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from "next/link";
@@ -99,10 +100,16 @@ export default function SignupPage() {
 
     } catch (error: any) {
       console.error("Error signing up:", error);
+      let description = "An unexpected error occurred. Please try again.";
+      if (error.code === 'auth/email-already-in-use') {
+        description = 'This email address is already in use by another account.';
+      } else {
+        description = error.message;
+      }
       toast({
         variant: "destructive",
         title: "Signup Failed",
-        description: error.message,
+        description: description,
       });
     } finally {
         setIsLoading(false);
