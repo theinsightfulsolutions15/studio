@@ -36,19 +36,6 @@ export default function SettingsPage() {
   const [address, setAddress] = useState('');
   const [mobileNo, setMobileNo] = useState('');
 
-  // AMC Details state
-  const [amcProvider, setAmcProvider] = useState('');
-  const [amcExpiry, setAmcExpiry] = useState('');
-  const [amcDescription, setAmcDescription] = useState('');
-
-  const amcDetailsRef = useMemoFirebase(() => {
-    if (!user) return null;
-    // Assuming one AMC detail doc per user for simplicity, with a fixed ID
-    return doc(firestore, `users/${user.uid}/amc_details/main`);
-  }, [user, firestore]);
-
-  const { data: amcData, isLoading: isAmcLoading } = useDoc(amcDetailsRef);
-
   useEffect(() => {
     if (userData) {
       setDisplayName(userData.name || user?.displayName || '');
@@ -58,14 +45,6 @@ export default function SettingsPage() {
       setDisplayName(user.displayName || '');
     }
   }, [userData, user]);
-
-  useEffect(() => {
-    if (amcData) {
-      setAmcProvider(amcData.providerName || '');
-      setAmcExpiry(amcData.endDate?.split('T')[0] || '');
-      setAmcDescription(amcData.description || '');
-    }
-  }, [amcData]);
 
 
   const handleProfileSave = () => {
@@ -82,25 +61,6 @@ export default function SettingsPage() {
     toast({
       title: "Success",
       description: "Profile updated successfully.",
-    });
-  };
-
-  const handleAmcUpdate = () => {
-    if (!user || !amcDetailsRef) {
-        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to update AMC details.' });
-        return;
-    }
-    const amcDataToSave = {
-        userId: user.uid,
-        providerName: amcProvider,
-        description: amcDescription,
-        startDate: new Date().toISOString(),
-        endDate: amcExpiry ? new Date(amcExpiry).toISOString() : '',
-    };
-    setDocumentNonBlocking(amcDetailsRef, amcDataToSave, { merge: true });
-    toast({
-        title: "AMC Details Updated",
-        description: "Your AMC details have been saved.",
     });
   };
 
@@ -141,43 +101,6 @@ export default function SettingsPage() {
                     {isLoading ? <Skeleton className="h-20 w-full" /> : <Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} />}
                 </div>
                 <Button onClick={handleProfileSave} disabled={isLoading}>Save Changes</Button>
-            </CardContent>
-        </Card>
-        
-        <Card>
-            <CardHeader>
-                <CardTitle>AMC Details</CardTitle>
-                <CardDescription>Track Annual Maintenance Contract details for the application.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {isAmcLoading ? (
-                  <div className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                        <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-                        <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-                    </div>
-                     <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-20 w-full" /></div>
-                     <Skeleton className="h-10 w-36" />
-                  </div>
-                ) : (
-                <>
-                    <div className="grid md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="amc-provider">Provider Name</Label>
-                            <Input id="amc-provider" value={amcProvider} onChange={(e) => setAmcProvider(e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="amc-expiry">Expiry Date</Label>
-                            <Input id="amc-expiry" type="date" value={amcExpiry} onChange={(e) => setAmcExpiry(e.target.value)} />
-                        </div>
-                    </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="amc-description">Description</Label>
-                        <Textarea id="amc-description" placeholder="Enter AMC description" value={amcDescription} onChange={(e) => setAmcDescription(e.target.value)} />
-                    </div>
-                    <Button onClick={handleAmcUpdate}>Update AMC Details</Button>
-                </>
-                )}
             </CardContent>
         </Card>
 
