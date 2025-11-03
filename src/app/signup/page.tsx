@@ -46,6 +46,8 @@ export default function SignupPage() {
       setDocumentNonBlocking(userRef, userData, { merge: true });
 
       if (isAdmin) {
+        const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
+        setDocumentNonBlocking(adminRoleRef, { uid: user.uid }, { merge: true });
         toast({
           title: "Admin Account Created",
           description: "Your admin account has been successfully created.",
