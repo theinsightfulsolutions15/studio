@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, PlusCircle } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collectionGroup, query, where, getDocs, collection } from 'firebase/firestore';
+import { collectionGroup, query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
 import type { AnimalMovement } from '@/lib/types';
@@ -96,36 +96,27 @@ function MovementsTable({ movements, isLoading }: { movements: AnimalMovement[] 
 
 export default function MovementPage() {
   const firestore = useFirestore();
-  const [allMovements, setAllMovements] = useState<AnimalMovement[] | null>(null);
+  
+  const movementsQuery = useMemoFirebase(() => {
+      if (!firestore) return null;
+      return query(collectionGroup(firestore, 'movements'));
+  }, [firestore]);
+
+  const { data: allMovements, isLoading: isLoadingAll, error } = useCollection<AnimalMovement>(movementsQuery);
+
   const [entryMovements, setEntryMovements] = useState<AnimalMovement[] | null>(null);
   const [exitMovements, setExitMovements] = useState<AnimalMovement[] | null>(null);
-  const [isLoadingAll, setIsLoadingAll] = useState(true);
   const [isLoadingEntry, setIsLoadingEntry] = useState(true);
   const [isLoadingExit, setIsLoadingExit] = useState(true);
-
+  
   useEffect(() => {
-    if (!firestore) return;
-
-    const fetchMovements = async () => {
-      setIsLoadingAll(true);
-      setIsLoadingEntry(true);
-      setIsLoadingExit(true);
-
-      const movementsQuery = query(collectionGroup(firestore, 'movements'));
-      const snapshot = await getDocs(movementsQuery);
-      const all = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AnimalMovement));
-      setAllMovements(all);
-      setIsLoadingAll(false);
-      
-      setEntryMovements(all.filter(m => m.type === 'Entry'));
-      setIsLoadingEntry(false);
-      
-      setExitMovements(all.filter(m => m.type === 'Exit'));
-      setIsLoadingExit(false);
-    };
-
-    fetchMovements();
-  }, [firestore]);
+    if (allMovements) {
+        setEntryMovements(allMovements.filter(m => m.type === 'Entry'));
+        setExitMovements(allMovements.filter(m => m.type === 'Exit'));
+        setIsLoadingEntry(false);
+        setIsLoadingExit(false);
+    }
+  }, [allMovements]);
 
 
   return (
