@@ -72,11 +72,8 @@ service cloud.firestore {
      * @principle Restricts access to a user's own data tree.
      */
     match /users/{userId}/amc_details/{amcDetailId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isOwner(userId) || isAdmin();
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && (isExistingOwner(userId) || isAdmin());
-      allow delete: if isSignedIn() && (isExistingOwner(userId) || isAdmin());
+      allow get, list: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow create, update, delete: if isSignedIn() && (isOwner(userId) || isAdmin());
     }
 
     /**
