@@ -1,0 +1,204 @@
+/**
+ * @fileoverview Firestore Security Rules for the GauRakshak application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for personal data (users and their associated AMC details),
+ * and a public-read with owner-write model for animal records and financial transactions. Administrative privileges
+ * are managed through a dedicated collection, `roles_admin`.
+ *
+ * Data Structure:
+ * - `/users/{userId}`: Stores personal user data. Only the user themselves can read or write their own document.
+ * - `/users/{userId}/amc_details/{amcDetailId}`: Stores AMC details specific to a user. Only the user can manage these details.
+ * - `/animals/{animalId}`: Stores animal records. These are publicly readable, but only the creating user can modify or delete them.
+ *   Each animal document MUST contain a denormalized `ownerId` field that matches the user who created it.
+ * - `/animals/{animalId}/movements/{animalMovementId}`: Stores movement history for each animal. Inherits access control from the parent animal document.
+ *   The existence of the parent document must be validated before allowing operations on the movement records.
+ * - `/financial_records/{financialRecordId}`: Stores financial records. Publicly readable, but write access is restricted to the creating user.
+ *   Each financial record MUST contain a denormalized `ownerId` field indicating the creator.
+ * - `/roles_admin/{userId}`: Presence of a document in this collection grants the user admin privileges.
+ *
+ * Key Security Decisions:
+ * - User listing is explicitly disallowed.
+ * - The default security posture is strict: if a relationship or permission is not explicitly granted, it is denied.
+ * - Data validation is minimized to facilitate rapid prototyping. Only authorization-critical fields are validated.
+ *
+ * Denormalization for Authorization:
+ * - `animals` and `financial_records` collections include an `ownerId` field to simplify write authorization and avoid `get()` calls.
+ * - Admin status is determined by the presence of a document in the `roles_admin` collection, avoiding complex role lookups.
+ *
+ * Structural Segregation:
+ * - Private user data is stored under the `/users/{userId}` path, while public animal and financial data reside in top-level collections.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Grants access to user profile documents based on path-based ownership.
+     * @path /users/{userId}
+     * @allow (create) User with ID 'user123' can create their own profile.
+     *        request.auth.uid == 'user123' && request.resource.data.id == 'user123'
+     * @allow (get) User with ID 'user123' can read their own profile.
+     *        request.auth.uid == 'user123'
+     * @allow (update) User with ID 'user123' can update their own profile.
+     *        request.auth.uid == 'user123' && resource.data.id == 'user123'
+     * @allow (delete) User with ID 'user123' can delete their own profile.
+     *        request.auth.uid == 'user123' && resource.data.id == 'user123'
+     * @deny (create) User with ID 'user456' cannot create a profile for 'user123'.
+     *       request.auth.uid == 'user456' && request.resource.data.id == 'user123'
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isSignedIn() && isOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Grants access to AMC details based on path-based ownership.
+     * @path /users/{userId}/amc_details/{amcDetailId}
+     * @allow (create) User with ID 'user123' can create AMC details under their profile.
+     *        request.auth.uid == 'user123'
+     * @allow (get) User with ID 'user123' can read AMC details under their profile.
+     *        request.auth.uid == 'user123'
+     * @allow (update) User with ID 'user123' can update AMC details under their profile.
+     *        request.auth.uid == 'user123'
+     * @allow (delete) User with ID 'user123' can delete AMC details under their profile.
+     *        request.auth.uid == 'user123'
+     * @deny (create) User with ID 'user456' cannot create AMC details under 'user123'.
+     *       request.auth.uid == 'user456'
+     * @principle Restricts access to a user's own data tree.
+     */
+    match /users/{userId}/amc_details/{amcDetailId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isExistingOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
+    }
+
+    /**
+     * @description Grants public read access to animal records but restricts write access to the owner.
+     * @path /animals/{animalId}
+     * @allow (get) Any user can read animal records.
+     *        true
+     * @allow (list) Any user can list animal records.
+     *        true
+     * @allow (create) User with ID 'user123' can create an animal record with ownerId 'user123'.
+     *        request.auth.uid == 'user123' && request.resource.data.ownerId == 'user123'
+     * @allow (update) User with ID 'user123' can update their own animal record with ownerId 'user123'.
+     *        request.auth.uid == 'user123' && resource.data.ownerId == 'user123'
+     * @allow (delete) User with ID 'user123' can delete their own animal record with ownerId 'user123'.
+     *        request.auth.uid == 'user123' && resource.data.ownerId == 'user123'
+     * @deny (create) User with ID 'user456' cannot create an animal record with ownerId 'user123'.
+     *        request.auth.uid == 'user456' && request.resource.data.ownerId == 'user123'
+     * @principle Enforces document ownership for writes, allows public reads.
+     */
+    match /animals/{animalId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isSignedIn() && isExistingOwner(resource.data.ownerId);
+      allow delete: if isSignedIn() && isExistingOwner(resource.data.ownerId);
+    }
+
+    /**
+     * @description Grants access to animal movement records, inheriting ownership from the parent animal document.
+     * @path /animals/{animalId}/movements/{animalMovementId}
+     * @allow (create) User can create a movement record if they own the parent animal.
+     *        isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid
+     * @allow (get) User can read a movement record if they own the parent animal.
+     *        isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid
+     * @allow (update) User can update a movement record if they own the parent animal.
+     *        isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid
+     * @allow (delete) User can delete a movement record if they own the parent animal.
+     *        isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid
+     * @deny (create) User cannot create a movement record if they do not own the parent animal.
+     *        isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId != request.auth.uid
+     * @principle Inherits ownership from the parent document.
+     */
+    match /animals/{animalId}/movements/{animalMovementId} {
+      allow get: if isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid;
+      allow list: if isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid;
+      allow update: if isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid;
+      allow delete: if isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid;
+    }
+
+    /**
+     * @description Grants public read access to financial records but restricts write access to the owner.
+     * @path /financial_records/{financialRecordId}
+     * @allow (get) Any user can read financial records.
+     *        true
+     * @allow (list) Any user can list financial records.
+     *        true
+     * @allow (create) User with ID 'user123' can create a financial record with ownerId 'user123'.
+     *        request.auth.uid == 'user123' && request.resource.data.ownerId == 'user123'
+     * @allow (update) User with ID 'user123' can update their own financial record with ownerId 'user123'.
+     *        request.auth.uid == 'user123' && resource.data.ownerId == 'user123'
+     * @allow (delete) User with ID 'user123' can delete their own financial record with ownerId 'user123'.
+     *        request.auth.uid == 'user123' && resource.data.ownerId == 'user123'
+     * @deny (create) User with ID 'user456' cannot create a financial record with ownerId 'user123'.
+     *        request.auth.uid == 'user456' && request.resource.data.ownerId == 'user123'
+     * @principle Enforces document ownership for writes, allows public reads.
+     */
+    match /financial_records/{financialRecordId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isSignedIn() && isExistingOwner(resource.data.ownerId);
+      allow delete: if isSignedIn() && isExistingOwner(resource.data.ownerId);
+    }
+
+    /**
+     * @description Grants admin privileges based on the existence of a document in this collection.
+     * @path /roles_admin/{userId}
+     * @allow (create) N/A - Admins are managed server-side, not client-side.
+     *        false
+     * @allow (get) Any user can check if another user is an admin.
+     *        true;
+     * @allow (list) N/A - There is no intention to list all administrators.
+     *        false
+     * @allow (update) N/A - Admins are managed server-side, not client-side.
+     *        false
+     * @allow (delete) N/A - Admins are managed server-side, not client-side.
+     *        false
+     * @principle Role-based access control using a dedicated collection.
+     */
+    match /roles_admin/{userId} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Helper function to determine if a user is signed in.
+     * @return {boolean} True if the user is signed in, false otherwise.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Helper function to determine if the request is made by the owner of the document.
+     * @param {string} userId The user ID to check against.
+     * @return {boolean} True if the request is made by the owner, false otherwise.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Helper function to determine if the request is made by the owner of an existing document.
+     * @param {string} userId The user ID to check against.
+     * @return {boolean} True if the request is made by the owner and the document exists, false otherwise.
+     */
+    function isExistingOwner(userId) {
+      return isSignedIn() && isOwner(userId) && resource != null;
+    }
+  }
+}
