@@ -62,19 +62,20 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes, allows public reads.
      */
     match /animals/{animalId} {
-      allow get, list: if true;
+      allow read: if isSignedIn();
       allow create, update, delete: if isSignedIn() && (isOwner(request.resource.data.ownerId) || isAdmin()) && !isExpired();
+
+        /**
+         * @description Grants access to animal movement records, inheriting ownership from the parent animal document.
+         * @path /animals/{animalId}/movements/{animalMovementId}
+         * @principle Inherits ownership from the parent document.
+         */
+        match /movements/{movementId} {
+            allow read: if isSignedIn();
+            allow write: if (isOwner(get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId) || isAdmin()) && !isExpired();
+        }
     }
 
-    /**
-     * @description Grants access to animal movement records, inheriting ownership from the parent animal document.
-     * @path /animals/{animalId}/movements/{animalMovementId}
-     * @principle Inherits ownership from the parent document.
-     */
-    match /animals/{animalId}/movements/{animalMovementId} {
-      allow read: if isSignedIn() && (get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid || isAdmin());
-      allow write: if isSignedIn() && (get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid || isAdmin()) && !isExpired();
-    }
 
     /**
      * @description Grants public read access to financial records but restricts write access to the owner if not expired.
@@ -82,7 +83,7 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes, allows public reads.
      */
     match /financial_records/{financialRecordId} {
-      allow get, list: if true;
+      allow get, list: if isSignedIn();
       allow create, update, delete: if isSignedIn() && (isOwner(request.resource.data.ownerId) || isAdmin()) && !isExpired();
     }
 

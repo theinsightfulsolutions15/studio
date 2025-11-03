@@ -26,9 +26,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, PlusCircle } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collectionGroup, query, where, getDocs, collection } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AnimalMovement } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -96,14 +96,37 @@ function MovementsTable({ movements, isLoading }: { movements: AnimalMovement[] 
 
 export default function MovementPage() {
   const firestore = useFirestore();
-  
-  const allMovementsQuery = useMemoFirebase(() => collection(firestore, 'animal_movements'), [firestore]);
-  const entryMovementsQuery = useMemoFirebase(() => query(collection(firestore, 'animal_movements'), where('type', '==', 'Entry')), [firestore]);
-  const exitMovementsQuery = useMemoFirebase(() => query(collection(firestore, 'animal_movements'), where('type', '==', 'Exit')), [firestore]);
+  const [allMovements, setAllMovements] = useState<AnimalMovement[] | null>(null);
+  const [entryMovements, setEntryMovements] = useState<AnimalMovement[] | null>(null);
+  const [exitMovements, setExitMovements] = useState<AnimalMovement[] | null>(null);
+  const [isLoadingAll, setIsLoadingAll] = useState(true);
+  const [isLoadingEntry, setIsLoadingEntry] = useState(true);
+  const [isLoadingExit, setIsLoadingExit] = useState(true);
 
-  const { data: allMovements, isLoading: isLoadingAll } = useCollection<AnimalMovement>(allMovementsQuery);
-  const { data: entryMovements, isLoading: isLoadingEntry } = useCollection<AnimalMovement>(entryMovementsQuery);
-  const { data: exitMovements, isLoading: isLoadingExit } = useCollection<AnimalMovement>(exitMovementsQuery);
+  useEffect(() => {
+    if (!firestore) return;
+
+    const fetchMovements = async () => {
+      setIsLoadingAll(true);
+      setIsLoadingEntry(true);
+      setIsLoadingExit(true);
+
+      const movementsQuery = query(collectionGroup(firestore, 'movements'));
+      const snapshot = await getDocs(movementsQuery);
+      const all = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as AnimalMovement));
+      setAllMovements(all);
+      setIsLoadingAll(false);
+      
+      setEntryMovements(all.filter(m => m.type === 'Entry'));
+      setIsLoadingEntry(false);
+      
+      setExitMovements(all.filter(m => m.type === 'Exit'));
+      setIsLoadingExit(false);
+    };
+
+    fetchMovements();
+  }, [firestore]);
+
 
   return (
     <Card>
