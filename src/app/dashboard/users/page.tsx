@@ -38,9 +38,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, doc, updateDoc, getDocs } from 'firebase/firestore';
-import type { User } from '@/lib/types';
+import type { User as AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
@@ -48,7 +48,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 
 // Helper function to generate the next customer ID
-const getNextCustomerId = (users: User[] | null): string => {
+const getNextCustomerId = (users: AppUser[] | null): string => {
     if (!users || users.length === 0) {
         return 'G-001';
     }
@@ -93,21 +93,28 @@ function UserRowSkeleton() {
 
 export default function UsersPage() {
   const firestore = useFirestore();
-  const { user: currentUser } = useUser();
+  const { user: authUser } = useUser();
   const { toast } = useToast();
   const [isApproving, setIsApproving] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
   const [validityDate, setValidityDate] = useState<Date | undefined>();
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const usersCollection = useMemoFirebase(() => {
-    if (!currentUser || !firestore) return null;
-    return collection(firestore, 'users');
-  }, [currentUser, firestore]);
+  const userDocRef = useMemoFirebase(() => {
+    if (!authUser) return null;
+    return doc(firestore, 'users', authUser.uid);
+  }, [authUser, firestore]);
 
-  const { data: users, isLoading } = useCollection<User>(usersCollection);
+  const { data: currentUser, isLoading: isUserLoading } = useDoc<AppUser>(userDocRef);
 
   const isAdmin = currentUser?.role === 'Admin';
+  
+  const usersCollection = useMemoFirebase(() => {
+    if (!isAdmin || !firestore) return null;
+    return collection(firestore, 'users');
+  }, [isAdmin, firestore]);
+
+  const { data: users, isLoading: isLoadingUsers } = useCollection<AppUser>(usersCollection);
 
 
   const handleApproveUser = async () => {
@@ -122,7 +129,7 @@ export default function UsersPage() {
     setIsApproving(selectedUser.id);
     try {
         const usersSnapshot = await getDocs(collection(firestore, 'users'));
-        const allUsers: User[] = usersSnapshot.docs.map(d => d.data() as User);
+        const allUsers: AppUser[] = usersSnapshot.docs.map(d => d.data() as AppUser);
 
         const newCustomerId = getNextCustomerId(allUsers);
         const userDocRef = doc(firestore, 'users', selectedUser.id);
@@ -152,9 +159,24 @@ export default function UsersPage() {
     }
   };
 
-  const openApprovalDialog = (user: User) => {
+  const openApprovalDialog = (user: AppUser) => {
     setSelectedUser(user);
     setDialogOpen(true);
+  }
+
+  if (isUserLoading) {
+      return <Card><CardHeader><CardTitle>Loading...</CardTitle></CardHeader></Card>
+  }
+  
+  if (!isAdmin) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Access Denied</CardTitle>
+                <CardDescription>You do not have permission to view this page.</CardDescription>
+            </CardHeader>
+        </Card>
+    );
   }
 
 
@@ -188,7 +210,7 @@ export default function UsersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(isLoading || !currentUser) && Array.from({ length: 4 }).map((_, i) => <UserRowSkeleton key={i} />)}
+            {(isLoadingUsers || !currentUser) && Array.from({ length: 4 }).map((_, i) => <UserRowSkeleton key={i} />)}
             {users?.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>

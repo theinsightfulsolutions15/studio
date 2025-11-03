@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, PlusCircle } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collectionGroup, query, where } from 'firebase/firestore';
+import { collectionGroup, query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
 import type { AnimalMovement } from '@/lib/types';
@@ -103,26 +103,20 @@ export default function MovementPage() {
       return query(collectionGroup(firestore, 'movements'));
   }, [firestore, user]);
 
-  const { data: allMovements, isLoading: isLoadingAll, error } = useCollection<AnimalMovement>(movementsQuery);
+  const { data: allMovements, isLoading: isLoadingAll } = useCollection<AnimalMovement>(movementsQuery);
 
   const [entryMovements, setEntryMovements] = useState<AnimalMovement[] | null>(null);
   const [exitMovements, setExitMovements] = useState<AnimalMovement[] | null>(null);
-  const [isLoadingEntry, setIsLoadingEntry] = useState(true);
-  const [isLoadingExit, setIsLoadingExit] = useState(true);
   
   useEffect(() => {
-    if (isLoadingAll) {
-        setIsLoadingEntry(true);
-        setIsLoadingExit(true);
-        return;
-    }
     if (allMovements) {
         setEntryMovements(allMovements.filter(m => m.type === 'Entry'));
         setExitMovements(allMovements.filter(m => m.type === 'Exit'));
+    } else {
+        setEntryMovements(null);
+        setExitMovements(null);
     }
-    setIsLoadingEntry(false);
-    setIsLoadingExit(false);
-  }, [allMovements, isLoadingAll]);
+  }, [allMovements]);
 
 
   return (
@@ -150,10 +144,10 @@ export default function MovementPage() {
             <MovementsTable movements={allMovements} isLoading={isLoadingAll} />
           </TabsContent>
           <TabsContent value="entries" className="mt-4">
-             <MovementsTable movements={entryMovements} isLoading={isLoadingEntry} />
+             <MovementsTable movements={entryMovements} isLoading={isLoadingAll} />
           </TabsContent>
            <TabsContent value="exits" className="mt-4">
-             <MovementsTable movements={exitMovements} isLoading={isLoadingExit} />
+             <MovementsTable movements={exitMovements} isLoading={isLoadingAll} />
           </TabsContent>
         </Tabs>
       </CardContent>

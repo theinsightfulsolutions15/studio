@@ -28,9 +28,9 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, doc, updateDoc } from 'firebase/firestore';
-import type { AmcRenewal } from '@/lib/types';
+import type { AmcRenewal, User as AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
@@ -52,7 +52,7 @@ function RenewalRowSkeleton() {
 
 export default function AmcRenewalsPage() {
   const firestore = useFirestore();
-  const { user: currentUser } = useUser();
+  const { user: authUser } = useUser();
   const { toast } = useToast();
   
   const [selectedRenewal, setSelectedRenewal] = useState<AmcRenewal | null>(null);
@@ -60,14 +60,23 @@ export default function AmcRenewalsPage() {
   const [isApproving, setIsApproving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const renewalsCollection = useMemoFirebase(() => {
-    if (!currentUser || !firestore) return null;
-    return collection(firestore, 'amc_renewals')
-  }, [currentUser, firestore]);
+  const userDocRef = useMemoFirebase(() => {
+    if (!authUser) return null;
+    return doc(firestore, 'users', authUser.uid);
+  }, [authUser, firestore]);
 
-  const { data: renewals, isLoading } = useCollection<AmcRenewal>(renewalsCollection);
+  const { data: currentUser, isLoading: isUserLoading } = useDoc<AppUser>(userDocRef);
 
   const isAdmin = currentUser?.role === 'Admin';
+
+  const renewalsCollection = useMemoFirebase(() => {
+    // Only fetch if the user is an admin
+    if (!isAdmin || !firestore) return null;
+    return collection(firestore, 'amc_renewals')
+  }, [isAdmin, firestore]);
+
+  const { data: renewals, isLoading: isLoadingRenewals } = useCollection<AmcRenewal>(renewalsCollection);
+
 
   const openApproveDialog = (renewal: AmcRenewal) => {
     setSelectedRenewal(renewal);
@@ -117,6 +126,20 @@ export default function AmcRenewalsPage() {
     }
   };
 
+  if (isUserLoading) {
+     return (
+         <Card>
+            <CardHeader>
+                <CardTitle>AMC Renewals</CardTitle>
+                <CardDescription>Review and approve pending AMC renewal requests.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {Array.from({ length: 5 }).map((_, i) => <RenewalRowSkeleton key={i} />)}
+            </CardContent>
+        </Card>
+     )
+  }
+
   if (!isAdmin) {
     return (
         <Card>
@@ -148,7 +171,7 @@ export default function AmcRenewalsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(isLoading || !currentUser) && Array.from({ length: 5 }).map((_, i) => <RenewalRowSkeleton key={i} />)}
+            {(isLoadingRenewals) && Array.from({ length: 5 }).map((_, i) => <RenewalRowSkeleton key={i} />)}
             {renewals?.map((renewal) => (
               <TableRow key={renewal.id}>
                 <TableCell>{renewal.date}</TableCell>

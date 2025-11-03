@@ -28,7 +28,7 @@ import { Input } from '@/components/ui/input';
 import { MoreHorizontal, PlusCircle, Search } from 'lucide-react';
 import Image from 'next/image';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import type { Animal } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -55,7 +55,7 @@ export default function AnimalsPage() {
 
   const animalsCollection = useMemoFirebase(() => {
     if (!user || !firestore) return null;
-    return collection(firestore, 'animals');
+    return query(collection(firestore, 'animals'));
   }, [user, firestore]);
   
   const { data: animals, isLoading } = useCollection<Animal>(animalsCollection);
