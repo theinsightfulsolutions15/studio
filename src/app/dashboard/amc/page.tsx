@@ -134,7 +134,21 @@ export default function AmcRenewalsPage() {
                 <CardDescription>Review and approve pending AMC renewal requests.</CardDescription>
             </CardHeader>
             <CardContent>
-                {Array.from({ length: 5 }).map((_, i) => <RenewalRowSkeleton key={i} />)}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Customer ID</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 5 }).map((_, i) => <RenewalRowSkeleton key={i} />)}
+                </TableBody>
+              </Table>
             </CardContent>
         </Card>
      )
