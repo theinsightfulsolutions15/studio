@@ -30,20 +30,30 @@ export default function SignupPage() {
       const user = userCredential.user;
 
       const userRef = doc(firestore, 'users', user.uid);
+      
+      const isAdmin = email === 'theinsightfulsolutions@gmail.com';
+      
       const userData = {
         id: user.uid,
         name: fullName,
         email: email,
-        role: 'User',
-        status: 'Pending',
+        role: isAdmin ? 'Admin' : 'User',
+        status: isAdmin ? 'Active' : 'Pending',
         signupDate: new Date().toISOString().split('T')[0],
       };
       setDocumentNonBlocking(userRef, userData, { merge: true });
 
-      toast({
-        title: "Account Created",
-        description: "Your account has been created. Please wait for admin approval.",
-      });
+      if (isAdmin) {
+        toast({
+          title: "Admin Account Created",
+          description: "Your admin account has been successfully created.",
+        });
+      } else {
+        toast({
+          title: "Account Created",
+          description: "Your account has been created. Please wait for admin approval.",
+        });
+      }
 
       router.push('/');
 
