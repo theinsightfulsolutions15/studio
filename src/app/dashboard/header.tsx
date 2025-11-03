@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { useAuth, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Bell } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -60,10 +61,13 @@ function DateTimeDisplay() {
 export default function Header() {
   const { user } = useUser();
   const auth = useAuth();
+  const router = useRouter();
 
   const handleLogout = () => {
     if (auth) {
-      signOut(auth);
+      signOut(auth).then(() => {
+        router.push('/');
+      });
     }
   };
 
