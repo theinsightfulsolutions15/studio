@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -15,23 +16,24 @@ import Link from 'next/link';
 import { useAuth, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useState, useEffect } from 'react';
+import { Bell } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 function DateTimeDisplay() {
   const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
 
   useEffect(() => {
-    // Set the initial date on the client to avoid hydration mismatch
     setCurrentDateTime(new Date());
 
     const timer = setInterval(() => {
       setCurrentDateTime(new Date());
-    }, 1000); // Update every second
+    }, 1000);
 
-    return () => clearInterval(timer); // Cleanup on component unmount
+    return () => clearInterval(timer);
   }, []);
 
   if (!currentDateTime) {
-    return null; // Or a loading skeleton
+    return null;
   }
 
   const date = currentDateTime.toLocaleDateString(undefined, {
@@ -66,7 +68,7 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6">
+    <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-4 border-b bg-card px-4 md:px-6">
       <SidebarTrigger className="md:hidden" />
       
       <div className="flex-1">
@@ -74,6 +76,34 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-4">
+         <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="relative rounded-full">
+              <Bell className="h-5 w-5" />
+              <Badge className="absolute -top-1 -right-1 h-4 w-4 justify-center rounded-full p-0 text-xs">3</Badge>
+              <span className="sr-only">Toggle notifications</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[300px]">
+            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="flex flex-col items-start gap-1">
+                <p className="font-medium">New User Pending</p>
+                <p className="text-xs text-muted-foreground">A new user has registered and is waiting for approval.</p>
+            </DropdownMenuItem>
+             <DropdownMenuSeparator />
+            <DropdownMenuItem className="flex flex-col items-start gap-1">
+                <p className="font-medium">Animal Record Updated</p>
+                <p className="text-xs text-muted-foreground">Health status of UID12345 changed to 'Sick'.</p>
+            </DropdownMenuItem>
+             <DropdownMenuSeparator />
+            <DropdownMenuItem className="flex flex-col items-start gap-1">
+                <p className="font-medium">New Donation Received</p>
+                <p className="text-xs text-muted-foreground">A donation of ₹5000 was received.</p>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">
