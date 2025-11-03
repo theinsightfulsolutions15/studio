@@ -72,104 +72,47 @@ service cloud.firestore {
      * @principle Restricts access to a user's own data tree.
      */
     match /users/{userId}/amc_details/{amcDetailId} {
-      allow get, list: if isSignedIn() && (isOwner(userId) || isAdmin());
-      allow create, update, delete: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow read, write: if isSignedIn() && (isOwner(userId) || isAdmin());
     }
 
     /**
-     * @description Grants public read access to animal records but restricts write access to the owner.
+     * @description Grants public read access to animal records but restricts write access to the owner if not expired.
      * @path /animals/{animalId}
-     * @allow (get) Any user can read animal records.
-     *        true
-     * @allow (list) Any user can list animal records.
-     *        true
-     * @allow (create) User with ID 'user123' can create an animal record with ownerId 'user123'.
-     *        request.auth.uid == 'user123' && request.resource.data.ownerId == 'user123'
-     * @allow (update) User with ID 'user123' can update their own animal record with ownerId 'user123'.
-     *        request.auth.uid == 'user123' && resource.data.ownerId == 'user123'
-     * @allow (delete) User with ID 'user123' can delete their own animal record with ownerId 'user123'.
-     *        request.auth.uid == 'user123' && resource.data.ownerId == 'user123'
-     * @deny (create) User with ID 'user456' cannot create an animal record with ownerId 'user123'.
-     *        request.auth.uid == 'user456' && request.resource.data.ownerId == 'user123'
      * @principle Enforces document ownership for writes, allows public reads.
      */
     match /animals/{animalId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isSignedIn() && (isExistingOwner(resource.data.ownerId) || isAdmin());
-      allow delete: if isSignedIn() && (isExistingOwner(resource.data.ownerId) || isAdmin());
+      allow get, list: if true;
+      allow create, update, delete: if isSignedIn() && (isOwner(request.resource.data.ownerId) || isAdmin()) && !isExpired();
     }
 
     /**
      * @description Grants access to animal movement records, inheriting ownership from the parent animal document.
      * @path /animals/{animalId}/movements/{animalMovementId}
-     * @allow (create) User can create a movement record if they own the parent animal.
-     *        isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid
-     * @allow (get) User can read a movement record if they own the parent animal.
-     *        isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid
-     * @allow (update) User can update a movement record if they own the parent animal.
-     *        isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid
-     * @allow (delete) User can delete a movement record if they own the parent animal.
-     *        isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid
-     * @deny (create) User cannot create a movement record if they do not own the parent animal.
-     *        isSignedIn() && get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId != request.auth.uid
      * @principle Inherits ownership from the parent document.
      */
     match /animals/{animalId}/movements/{animalMovementId} {
-      allow get: if isSignedIn() && (get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && (get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid || isAdmin());
-      allow update: if isSignedIn() && (get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid || isAdmin());
-      allow delete: if isSignedIn() && (get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid || isAdmin());
+      allow write: if isSignedIn() && (get(/databases/$(database)/documents/animals/$(animalId)).data.ownerId == request.auth.uid || isAdmin()) && !isExpired();
     }
 
     /**
-     * @description Grants public read access to financial records but restricts write access to the owner.
+     * @description Grants public read access to financial records but restricts write access to the owner if not expired.
      * @path /financial_records/{financialRecordId}
-     * @allow (get) Any user can read financial records.
-     *        true
-     * @allow (list) Any user can list financial records.
-     *        true
-     * @allow (create) User with ID 'user123' can create a financial record with ownerId 'user123'.
-     *        request.auth.uid == 'user123' && request.resource.data.ownerId == 'user123'
-     * @allow (update) User with ID 'user123' can update their own financial record with ownerId 'user123'.
-     *        request.auth.uid == 'user123' && resource.data.ownerId == 'user123'
-     * @allow (delete) User with ID 'user123' can delete their own financial record with ownerId 'user123'.
-     *        request.auth.uid == 'user123' && resource.data.ownerId == 'user123'
-     * @deny (create) User with ID 'user456' cannot create a financial record with ownerId 'user123'.
-     *        request.auth.uid == 'user456' && request.resource.data.ownerId == 'user123'
      * @principle Enforces document ownership for writes, allows public reads.
      */
     match /financial_records/{financialRecordId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isSignedIn() && (isExistingOwner(resource.data.ownerId) || isAdmin());
-      allow delete: if isSignedIn() && (isExistingOwner(resource.data.ownerId) || isAdmin());
+      allow get, list: if true;
+      allow create, update, delete: if isSignedIn() && (isOwner(request.resource.data.ownerId) || isAdmin()) && !isExpired();
     }
 
     /**
      * @description Grants admin privileges based on the existence of a document in this collection.
      * @path /roles_admin/{userId}
-     * @allow (create) N/A - Admins are managed server-side, not client-side.
-     *        false
-     * @allow (get) Any user can check if another user is an admin.
-     *        true;
-     * @allow (list) N/A - There is no intention to list all administrators.
-     *        false
-     * @allow (update) N/A - Admins are managed server-side, not client-side.
-     *        false
-     * @allow (delete) N/A - Admins are managed server-side, not client-side.
-     *        false
      * @principle Role-based access control using a dedicated collection.
      */
     match /roles_admin/{userId} {
       allow get: if true;
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow list, create, update, delete: if false;
     }
 
     /**
@@ -204,6 +147,20 @@ service cloud.firestore {
      */
     function isAdmin() {
       return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * @description Helper function to check if the user's account is expired.
+     * @return {boolean} True if the user's account is expired, false otherwise.
+     */
+    function isExpired() {
+        let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+        // If there's no validity date, they are not expired.
+        if (!('validityDate' in userDoc)) {
+            return false;
+        }
+        // Compare the validityDate string with the current time.
+        return userDoc.validityDate < request.time.toMillis().toString();
     }
   }
 }

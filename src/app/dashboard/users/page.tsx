@@ -24,16 +24,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, updateDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, updateDoc, getDocs } from 'firebase/firestore';
 import type { User } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Label } from '@/components/ui/label';
 
 // Helper function to generate the next customer ID
 const getNextCustomerId = (users: User[] | null): string => {
@@ -68,8 +81,8 @@ function UserRowSkeleton() {
         </div>
       </TableCell>
        <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-16" /></TableCell>
-      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-16" /></TableCell>
       <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
       <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
       <TableCell>
         <Skeleton className="h-8 w-8 rounded-md" />
@@ -84,6 +97,8 @@ export default function UsersPage() {
   const { user: currentUser } = useUser();
   const { toast } = useToast();
   const [isApproving, setIsApproving] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [validityDate, setValidityDate] = useState<Date | undefined>();
 
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: users, isLoading } = useCollection<User>(usersCollection);
@@ -91,19 +106,27 @@ export default function UsersPage() {
   const isAdmin = currentUser?.uid && users?.find(u => u.id === currentUser.uid)?.role === 'Admin';
 
 
-  const handleApproveUser = async (userId: string) => {
-    if (!firestore) return;
-    setIsApproving(userId);
+  const handleApproveUser = async () => {
+    if (!firestore || !selectedUser || !validityDate) {
+        toast({
+            variant: 'destructive',
+            title: 'Approval Failed',
+            description: 'Please select a validity date.',
+        });
+        return;
+    }
+    setIsApproving(selectedUser.id);
     try {
         const usersSnapshot = await getDocs(collection(firestore, 'users'));
         const allUsers: User[] = usersSnapshot.docs.map(d => d.data() as User);
 
         const newCustomerId = getNextCustomerId(allUsers);
-        const userDocRef = doc(firestore, 'users', userId);
+        const userDocRef = doc(firestore, 'users', selectedUser.id);
 
         await updateDoc(userDocRef, {
             status: 'Active',
             customerId: newCustomerId,
+            validityDate: validityDate.toISOString().split('T')[0],
         });
 
         toast({
@@ -119,11 +142,14 @@ export default function UsersPage() {
         });
     } finally {
         setIsApproving(null);
+        setSelectedUser(null);
+        setValidityDate(undefined);
     }
   };
 
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -143,8 +169,8 @@ export default function UsersPage() {
             <TableRow>
               <TableHead>User</TableHead>
               <TableHead className="hidden sm:table-cell">Customer ID</TableHead>
-              <TableHead className="hidden md:table-cell">Role</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="hidden md:table-cell">Validity Date</TableHead>
               <TableHead className="hidden lg:table-cell">Signup Date</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
@@ -168,12 +194,12 @@ export default function UsersPage() {
                     </div>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">{user.customerId || 'N/A'}</TableCell>
-                <TableCell className="hidden md:table-cell">{user.role}</TableCell>
                 <TableCell>
                   <Badge variant={user.status === 'Active' ? 'secondary' : user.status === 'Pending' ? 'default' : 'destructive'} className="bg-opacity-80">
                     {user.status}
                   </Badge>
                 </TableCell>
+                <TableCell className="hidden md:table-cell">{user.validityDate || 'N/A'}</TableCell>
                 <TableCell className="hidden lg:table-cell">{user.signupDate}</TableCell>
                 <TableCell>
                   <DropdownMenu>
@@ -187,9 +213,11 @@ export default function UsersPage() {
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         {user.status === 'Pending' && (
-                          <DropdownMenuItem onClick={() => handleApproveUser(user.id)} disabled={isApproving === user.id}>
-                            {isApproving === user.id ? 'Approving...' : 'Approve User'}
-                          </DropdownMenuItem>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem onSelect={() => setSelectedUser(user)}>
+                                Approve User
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
                         )}
                         <DropdownMenuItem>Edit Role</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive">Deactivate User</DropdownMenuItem>
@@ -207,5 +235,34 @@ export default function UsersPage() {
         </div>
       </CardFooter>
     </Card>
+
+    <AlertDialog open={!!selectedUser} onOpenChange={(isOpen) => !isOpen && setSelectedUser(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Approve User: {selectedUser?.name}</AlertDialogTitle>
+            <AlertDialogDescription>
+                Select a validity date for this user. They will have full access until this date.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="validity-date" className="text-right">
+                        Validity
+                    </Label>
+                    <div className="col-span-3">
+                        <DatePicker date={validityDate} setDate={setValidityDate} />
+                    </div>
+                </div>
+            </div>
+            <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleApproveUser} disabled={!validityDate || !!isApproving}>
+                {isApproving ? 'Approving...' : 'Approve'}
+            </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
+    </>
   );
 }

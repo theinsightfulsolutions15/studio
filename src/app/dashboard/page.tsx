@@ -22,9 +22,22 @@ import {
   Droplets,
   IndianRupee,
   Activity,
+  FileWarning,
 } from 'lucide-react';
 import { monthlyChartData } from '@/lib/placeholder-data';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { useUser } from '@/firebase';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection, serverTimestamp } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { useState } from 'react';
+import { DatePicker } from '@/components/ui/date-picker';
+
 
 const chartConfig = {
   milk: {
@@ -37,9 +50,109 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
+function AmcRenewalForm() {
+    const { user } = useUser();
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [amount, setAmount] = useState<number | ''>('');
+    const [transactionType, setTransactionType] = useState<string>('');
+    const [transactionDate, setTransactionDate] = useState<Date | undefined>(new Date());
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async () => {
+        if (!user || !firestore) {
+             toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
+            return;
+        }
+        if (!amount || !transactionType || !transactionDate) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please fill all fields.' });
+            return;
+        }
+
+        setIsSubmitting(true);
+        const amcCollectionRef = collection(firestore, `users/${user.uid}/amc_details`);
+        
+        try {
+            await addDocumentNonBlocking(amcCollectionRef, {
+                userId: user.uid,
+                amount,
+                transactionType,
+                date: transactionDate.toISOString(),
+                status: 'Pending',
+                submittedAt: serverTimestamp(),
+            });
+            toast({ title: 'Success', description: 'Your AMC renewal request has been submitted.' });
+            setAmount('');
+            setTransactionType('');
+            setTransactionDate(new Date());
+        } catch (error) {
+            console.error('Error submitting AMC:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit AMC renewal.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+         <Card className="border-amber-500/50 bg-amber-500/10">
+            <CardHeader>
+                <div className="flex items-center gap-3">
+                    <FileWarning className="h-6 w-6 text-amber-600" />
+                    <div>
+                        <CardTitle className="text-amber-800">Account Expired</CardTitle>
+                        <CardDescription className="text-amber-700">Your AMC has expired. Please renew to restore full access.</CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="customerId">Customer ID</Label>
+                        <Input id="customerId" value={user?.uid || ''} disabled />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="amount">Amount</Label>
+                        <Input id="amount" type="number" placeholder="Enter amount" value={amount} onChange={e => setAmount(Number(e.target.value))} />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="transactionDate">Date</Label>
+                        <DatePicker date={transactionDate} setDate={setTransactionDate} />
+                    </div>
+                </div>
+                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                    <div className="space-y-2">
+                        <Label htmlFor="transactionType">Transaction Type</Label>
+                        <Select onValueChange={setTransactionType} value={transactionType}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="RTGS">RTGS</SelectItem>
+                                <SelectItem value="NEFT">NEFT</SelectItem>
+                                <SelectItem value="UPI">UPI</SelectItem>
+                                <SelectItem value="Cash">Cash</SelectItem>
+                                <SelectItem value="Other">Other</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <Button onClick={handleSubmit} disabled={isSubmitting} className="w-full sm:w-auto">
+                        {isSubmitting ? 'Submitting...' : 'Submit for Renewal'}
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
+
 export default function Dashboard() {
+  const { user, isUserLoading } = useUser();
+  
+  const isExpired = user?.status === 'Expired';
+
+
   return (
     <div className="space-y-6">
+      {isExpired && <AmcRenewalForm />}
       <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
       
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

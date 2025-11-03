@@ -21,20 +21,22 @@ export type User = {
   name: string;
   email: string;
   role: 'Admin' | 'User';
-  status: 'Pending' | 'Active' | 'Inactive';
+  status: 'Pending' | 'Active' | 'Inactive' | 'Expired';
   signupDate: string;
-  customerId?: string; // Add customerId to the User type
+  customerId?: string;
   photoURL?: string;
+  validityDate?: string; // Added validityDate
 };
 
 export type FinancialRecord = {
   id: string;
   date: string;
-  type: 'Receipt' | 'Payment' | 'Expense';
+  type: 'Receipt' | 'Payment' | 'Expense' | 'AMC';
   category: string;
   amount: number;
   description: string;
   ownerId?: string;
+  transactionType?: 'RTGS' | 'NEFT' | 'UPI' | 'Cash' | 'Other';
 };
 
 export type MilkRecord = {
@@ -60,4 +62,15 @@ export type AnimalMovement = {
   type: 'Entry' | 'Exit';
   date: string;
   reason: string;
+};
+
+export type AmcDetail = {
+    id: string;
+    userId: string;
+    customerId?: string;
+    startDate: string;
+    endDate: string;
+    amount: number;
+    transactionType: 'RTGS' | 'NEFT' | 'UPI' | 'Cash' | 'Other';
+    description: string;
 };
