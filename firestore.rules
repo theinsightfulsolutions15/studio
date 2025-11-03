@@ -119,8 +119,8 @@ service cloud.firestore {
     match /amc_renewals/{renewalId} {
       // Users can create their own renewal requests.
       allow create: if isSignedIn() && isOwner(request.resource.data.userId);
-      // Admins can read, update, or delete renewal requests.
-      allow read, update, delete: if isAdmin();
+      // Admins can read, list, update, or delete renewal requests.
+      allow read, list, update, delete: if isAdmin();
     }
 
     /**
