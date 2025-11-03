@@ -42,7 +42,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Animals</CardTitle>
@@ -90,7 +90,7 @@ export default function Dashboard() {
           <CardTitle>Overview</CardTitle>
           <CardDescription>Monthly Milk Production vs Expenses</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pl-2">
           <ChartContainer config={chartConfig} className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyChartData}>

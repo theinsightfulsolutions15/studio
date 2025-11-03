@@ -13,10 +13,12 @@ export default function DashboardLayout({
         <Sidebar collapsible="icon">
           <Nav />
         </Sidebar>
-        <SidebarInset className="flex flex-col">
+        <SidebarInset className="flex flex-col flex-1">
           <Header />
-          <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
-            {children}
+          <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto bg-muted/30">
+            <div className="max-w-7xl mx-auto">
+              {children}
+            </div>
           </main>
         </SidebarInset>
       </div>
