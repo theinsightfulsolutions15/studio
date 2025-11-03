@@ -112,6 +112,7 @@ export default function UsersPage() {
   const isAdmin = currentUser?.role === 'Admin';
   
   const usersCollection = useMemoFirebase(() => {
+    // Only fetch if the current user is an admin
     if (!isAdmin || !firestore) return null;
     return collection(firestore, 'users');
   }, [isAdmin, firestore]);
@@ -164,7 +165,31 @@ export default function UsersPage() {
   }
 
   if (isUserLoading || isAuthUserLoading) {
-      return <Card><CardHeader><CardTitle>Loading...</CardTitle></CardHeader></Card>
+      return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Loading Users...</CardTitle>
+                <CardDescription>Please wait while we fetch the user data.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>User</TableHead>
+                            <TableHead className="hidden sm:table-cell">Customer ID</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="hidden md:table-cell">Validity Date</TableHead>
+                            <TableHead className="hidden lg:table-cell">Signup Date</TableHead>
+                            <TableHead><span className="sr-only">Actions</span></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {Array.from({ length: 5 }).map((_, i) => <UserRowSkeleton key={i} />)}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+      )
   }
   
   if (!isAdmin) {
@@ -209,7 +234,7 @@ export default function UsersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(isLoadingUsers || !currentUser) && Array.from({ length: 4 }).map((_, i) => <UserRowSkeleton key={i} />)}
+            {(isLoadingUsers) && Array.from({ length: 4 }).map((_, i) => <UserRowSkeleton key={i} />)}
             {users?.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>
@@ -260,7 +285,7 @@ export default function UsersPage() {
       </CardContent>
        <CardFooter>
         <div className="text-xs text-muted-foreground">
-          Showing <strong>1-{users?.length ?? 0}</strong> of <strong>{users?.length ?? 0}</strong> users
+          Showing <strong>{users?.length ?? 0}</strong> of <strong>{users?.length ?? 0}</strong> users
         </div>
       </CardFooter>
     </Card>
