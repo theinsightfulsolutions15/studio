@@ -11,10 +11,10 @@ import { Label } from "@/components/ui/label";
 import Logo from "@/components/logo";
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc } from 'firebase/firestore';
+import { doc, getDocs, collection, query, where } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from "@/hooks/use-toast";
-import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
+
 
 // Helper function to get the next customer ID
 async function getNextCustomerId(firestore: any): Promise<string> {
@@ -61,7 +61,7 @@ export default function SignupPage() {
 
       const userRef = doc(firestore, 'users', user.uid);
       
-      const isAdmin = email === 'theinsightfulsolutions@gmail.com';
+      const isAdmin = email.toLowerCase() === 'theinsightfulsolutions@gmail.com';
       
       let customerId = '';
       if (isAdmin) {
@@ -80,6 +80,7 @@ export default function SignupPage() {
         customerId: customerId, // Assign customerId for admin, empty for others
         validityDate: isAdmin ? '2099-12-31' : '', // Give admin a far future validity date
       };
+      
       await setDocumentNonBlocking(userRef, userData, { merge: true });
 
       if (isAdmin) {
