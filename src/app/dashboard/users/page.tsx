@@ -28,10 +28,32 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { collection, doc, updateDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import type { User } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
+
+// Helper function to generate the next customer ID
+const getNextCustomerId = (users: User[] | null): string => {
+    if (!users || users.length === 0) {
+        return 'G-001';
+    }
+
+    const existingIds = users
+        .map(u => u.customerId)
+        .filter((id): id is string => !!id && id.startsWith('G-'))
+        .map(id => parseInt(id.substring(2), 10))
+        .filter(num => !isNaN(num));
+
+    if (existingIds.length === 0) {
+        return 'G-001';
+    }
+
+    const maxId = Math.max(...existingIds);
+    return `G-${(maxId + 1).toString().padStart(3, '0')}`;
+};
 
 function UserRowSkeleton() {
   return (
@@ -45,6 +67,7 @@ function UserRowSkeleton() {
           </div>
         </div>
       </TableCell>
+       <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-16" /></TableCell>
       <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-16" /></TableCell>
       <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
       <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
@@ -58,8 +81,47 @@ function UserRowSkeleton() {
 
 export default function UsersPage() {
   const firestore = useFirestore();
+  const { user: currentUser } = useUser();
+  const { toast } = useToast();
+  const [isApproving, setIsApproving] = useState<string | null>(null);
+
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: users, isLoading } = useCollection<User>(usersCollection);
+
+  const isAdmin = currentUser?.uid && users?.find(u => u.id === currentUser.uid)?.role === 'Admin';
+
+
+  const handleApproveUser = async (userId: string) => {
+    if (!firestore) return;
+    setIsApproving(userId);
+    try {
+        const usersSnapshot = await getDocs(collection(firestore, 'users'));
+        const allUsers: User[] = usersSnapshot.docs.map(d => d.data() as User);
+
+        const newCustomerId = getNextCustomerId(allUsers);
+        const userDocRef = doc(firestore, 'users', userId);
+
+        await updateDoc(userDocRef, {
+            status: 'Active',
+            customerId: newCustomerId,
+        });
+
+        toast({
+            title: 'User Approved',
+            description: `The user has been approved with Customer ID: ${newCustomerId}`,
+        });
+    } catch (error) {
+        console.error("Error approving user:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Approval Failed',
+            description: 'Could not approve the user. Please try again.',
+        });
+    } finally {
+        setIsApproving(null);
+    }
+  };
+
 
   return (
     <Card>
@@ -69,7 +131,7 @@ export default function UsersPage() {
                 <CardTitle>User Management</CardTitle>
                 <CardDescription>Manage user accounts and roles.</CardDescription>
             </div>
-            <Button>
+            <Button disabled={!isAdmin}>
                 <UserPlus className="mr-2 h-4 w-4" />
                 Invite User
             </Button>
@@ -80,6 +142,7 @@ export default function UsersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>User</TableHead>
+              <TableHead className="hidden sm:table-cell">Customer ID</TableHead>
               <TableHead className="hidden md:table-cell">Role</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="hidden lg:table-cell">Signup Date</TableHead>
@@ -104,6 +167,7 @@ export default function UsersPage() {
                         </div>
                     </div>
                 </TableCell>
+                <TableCell className="hidden sm:table-cell">{user.customerId || 'N/A'}</TableCell>
                 <TableCell className="hidden md:table-cell">{user.role}</TableCell>
                 <TableCell>
                   <Badge variant={user.status === 'Active' ? 'secondary' : user.status === 'Pending' ? 'default' : 'destructive'} className="bg-opacity-80">
@@ -114,7 +178,7 @@ export default function UsersPage() {
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button aria-haspopup="true" size="icon" variant="ghost">
+                      <Button aria-haspopup="true" size="icon" variant="ghost" disabled={!isAdmin || isApproving === user.id}>
                         <MoreHorizontal className="h-4 w-4" />
                         <span className="sr-only">Toggle menu</span>
                       </Button>
@@ -122,7 +186,11 @@ export default function UsersPage() {
                     <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {user.status === 'Pending' && <DropdownMenuItem>Approve User</DropdownMenuItem>}
+                        {user.status === 'Pending' && (
+                          <DropdownMenuItem onClick={() => handleApproveUser(user.id)} disabled={isApproving === user.id}>
+                            {isApproving === user.id ? 'Approving...' : 'Approve User'}
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem>Edit Role</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive">Deactivate User</DropdownMenuItem>
                     </DropdownMenuContent>

@@ -23,6 +23,8 @@ export type User = {
   role: 'Admin' | 'User';
   status: 'Pending' | 'Active' | 'Inactive';
   signupDate: string;
+  customerId?: string; // Add customerId to the User type
+  photoURL?: string;
 };
 
 export type FinancialRecord = {

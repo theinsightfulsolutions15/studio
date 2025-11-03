@@ -22,9 +22,12 @@ export default function SignupPage() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -38,10 +41,11 @@ export default function SignupPage() {
         name: fullName,
         email: email,
         role: isAdmin ? 'Admin' : 'User',
-        status: isAdmin ? 'Active' : 'Pending',
+        status: isAdmin ? 'Active' : 'Pending', // Set status to 'Pending' for new users
         signupDate: new Date().toISOString().split('T')[0],
         address: '',
-        mobileNo: ''
+        mobileNo: '',
+        customerId: '', // Initialize customerId as empty
       };
       setDocumentNonBlocking(userRef, userData, { merge: true });
 
@@ -55,7 +59,7 @@ export default function SignupPage() {
       } else {
         toast({
           title: "Account Created",
-          description: "Your account has been created. Please wait for admin approval.",
+          description: "Your account has been created and is now pending admin approval.",
         });
       }
 
@@ -68,6 +72,8 @@ export default function SignupPage() {
         title: "Signup Failed",
         description: error.message,
       });
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -96,8 +102,8 @@ export default function SignupPage() {
                 <Label htmlFor="password">Password</Label>
                 <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} />
               </div>
-              <Button type="submit" className="w-full">
-                Create Account
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Creating Account...' : 'Create Account'}
               </Button>
             </div>
           </form>
