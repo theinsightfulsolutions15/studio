@@ -50,3 +50,12 @@ export type NavItem = {
   icon: LucideIcon;
   label?: string;
 };
+
+export type AnimalMovement = {
+  id: string;
+  animalId: string;
+  animalTag: string;
+  type: 'Entry' | 'Exit';
+  date: string;
+  reason: string;
+};

@@ -10,6 +10,7 @@ import {
   Settings,
   GlassWater,
   Beef,
+  Truck,
 } from 'lucide-react';
 
 import {
@@ -27,6 +28,7 @@ import { Separator } from './ui/separator';
 const navItems: NavItem[] = [
   { href: '/dashboard', title: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/animals', title: 'Animals', icon: Beef },
+  { href: '/dashboard/movement', title: 'Movement', icon: Truck },
   { href: '/dashboard/milk-records', title: 'Milk Records', icon: GlassWater },
   { href: '/dashboard/finance', title: 'Finance', icon: IndianRupee },
   { href: '/dashboard/reports', title: 'Reports', icon: BarChart2 },
