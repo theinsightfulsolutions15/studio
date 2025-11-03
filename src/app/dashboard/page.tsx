@@ -70,18 +70,20 @@ function AmcRenewalForm() {
         }
 
         setIsSubmitting(true);
-        const amcCollectionRef = collection(firestore, `users/${user.uid}/amc_details`);
+        const amcCollectionRef = collection(firestore, `amc_renewals`);
         
         try {
             await addDocumentNonBlocking(amcCollectionRef, {
                 userId: user.uid,
+                userName: user.displayName || user.email,
+                customerId: user.customerId,
                 amount,
                 transactionType,
-                date: transactionDate.toISOString(),
+                date: transactionDate.toISOString().split('T')[0],
                 status: 'Pending',
                 submittedAt: serverTimestamp(),
             });
-            toast({ title: 'Success', description: 'Your AMC renewal request has been submitted.' });
+            toast({ title: 'Success', description: 'Your AMC renewal request has been submitted for admin approval.' });
             setAmount('');
             setTransactionType('');
             setTransactionDate(new Date());
@@ -108,7 +110,7 @@ function AmcRenewalForm() {
                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="customerId">Customer ID</Label>
-                        <Input id="customerId" value={user?.uid || ''} disabled />
+                        <Input id="customerId" value={user?.customerId || ''} disabled />
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="amount">Amount</Label>

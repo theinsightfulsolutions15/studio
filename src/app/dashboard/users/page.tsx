@@ -33,7 +33,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -99,11 +98,12 @@ export default function UsersPage() {
   const [isApproving, setIsApproving] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [validityDate, setValidityDate] = useState<Date | undefined>();
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: users, isLoading } = useCollection<User>(usersCollection);
 
-  const isAdmin = currentUser?.uid && users?.find(u => u.id === currentUser.uid)?.role === 'Admin';
+  const isAdmin = currentUser?.role === 'Admin';
 
 
   const handleApproveUser = async () => {
@@ -144,8 +144,14 @@ export default function UsersPage() {
         setIsApproving(null);
         setSelectedUser(null);
         setValidityDate(undefined);
+        setDialogOpen(false);
     }
   };
+
+  const openApprovalDialog = (user: User) => {
+    setSelectedUser(user);
+    setDialogOpen(true);
+  }
 
 
   return (
@@ -213,11 +219,9 @@ export default function UsersPage() {
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         {user.status === 'Pending' && (
-                          <AlertDialogTrigger asChild>
-                            <DropdownMenuItem onSelect={() => setSelectedUser(user)}>
+                            <DropdownMenuItem onSelect={() => openApprovalDialog(user)}>
                                 Approve User
                             </DropdownMenuItem>
-                          </AlertDialogTrigger>
                         )}
                         <DropdownMenuItem>Edit Role</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive">Deactivate User</DropdownMenuItem>
@@ -236,7 +240,7 @@ export default function UsersPage() {
       </CardFooter>
     </Card>
 
-    <AlertDialog open={!!selectedUser} onOpenChange={(isOpen) => !isOpen && setSelectedUser(null)}>
+    <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <AlertDialogContent>
             <AlertDialogHeader>
             <AlertDialogTitle>Approve User: {selectedUser?.name}</AlertDialogTitle>

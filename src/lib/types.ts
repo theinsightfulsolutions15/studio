@@ -64,13 +64,14 @@ export type AnimalMovement = {
   reason: string;
 };
 
-export type AmcDetail = {
+export type AmcRenewal = {
     id: string;
     userId: string;
+    userName: string;
     customerId?: string;
-    startDate: string;
-    endDate: string;
+    date: string;
     amount: number;
     transactionType: 'RTGS' | 'NEFT' | 'UPI' | 'Cash' | 'Other';
-    description: string;
+    status: 'Pending' | 'Approved';
+    submittedAt: any; // Firestore Timestamp
 };

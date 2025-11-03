@@ -11,6 +11,7 @@ import {
   GlassWater,
   Beef,
   Truck,
+  ShieldCheck,
 } from 'lucide-react';
 
 import {
@@ -31,6 +32,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/movement', title: 'Movement', icon: Truck },
   { href: '/dashboard/milk-records', title: 'Milk Records', icon: GlassWater },
   { href: '/dashboard/finance', title: 'Finance', icon: IndianRupee },
+  { href: '/dashboard/amc', title: 'AMC Renewals', icon: ShieldCheck },
   { href: '/dashboard/reports', title: 'Reports', icon: BarChart2 },
   { href: '/dashboard/users', title: 'Users', icon: Users },
 ];

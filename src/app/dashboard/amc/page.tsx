@@ -1,0 +1,211 @@
+'use client';
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter
+} from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { collection, doc, updateDoc } from 'firebase/firestore';
+import type { AmcRenewal } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Label } from '@/components/ui/label';
+
+function RenewalRowSkeleton() {
+  return (
+    <TableRow>
+      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+      <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+      <TableCell><Skeleton className="h-8 w-24 rounded-md" /></TableCell>
+    </TableRow>
+  );
+}
+
+export default function AmcRenewalsPage() {
+  const firestore = useFirestore();
+  const { user: currentUser } = useUser();
+  const { toast } = useToast();
+  
+  const [selectedRenewal, setSelectedRenewal] = useState<AmcRenewal | null>(null);
+  const [newValidityDate, setNewValidityDate] = useState<Date | undefined>();
+  const [isApproving, setIsApproving] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const renewalsCollection = useMemoFirebase(() => collection(firestore, 'amc_renewals'), [firestore]);
+  const { data: renewals, isLoading } = useCollection<AmcRenewal>(renewalsCollection);
+
+  const isAdmin = currentUser?.role === 'Admin';
+
+  const openApproveDialog = (renewal: AmcRenewal) => {
+    setSelectedRenewal(renewal);
+    setDialogOpen(true);
+  };
+
+  const handleApproveRenewal = async () => {
+    if (!firestore || !selectedRenewal || !newValidityDate) {
+        toast({
+            variant: 'destructive',
+            title: 'Approval Failed',
+            description: 'Please select a new validity date.',
+        });
+        return;
+    }
+    setIsApproving(true);
+    try {
+      const userDocRef = doc(firestore, 'users', selectedRenewal.userId);
+      const renewalDocRef = doc(firestore, 'amc_renewals', selectedRenewal.id);
+
+      await updateDoc(userDocRef, {
+        validityDate: newValidityDate.toISOString().split('T')[0],
+        status: 'Active',
+      });
+
+      await updateDoc(renewalDocRef, {
+        status: 'Approved',
+      });
+
+      toast({
+        title: 'Renewal Approved',
+        description: `User ${selectedRenewal.userName}'s validity has been updated.`,
+      });
+
+    } catch (error) {
+      console.error("Error approving renewal:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Approval Failed',
+        description: 'Could not approve the renewal. Please try again.',
+      });
+    } finally {
+      setIsApproving(false);
+      setSelectedRenewal(null);
+      setNewValidityDate(undefined);
+      setDialogOpen(false);
+    }
+  };
+
+  if (!isAdmin) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Access Denied</CardTitle>
+                <CardDescription>You do not have permission to view this page.</CardDescription>
+            </CardHeader>
+        </Card>
+    );
+  }
+
+  return (
+    <>
+    <Card>
+      <CardHeader>
+        <CardTitle>AMC Renewals</CardTitle>
+        <CardDescription>Review and approve pending AMC renewal requests.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>User</TableHead>
+              <TableHead>Customer ID</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading && Array.from({ length: 5 }).map((_, i) => <RenewalRowSkeleton key={i} />)}
+            {renewals?.map((renewal) => (
+              <TableRow key={renewal.id}>
+                <TableCell>{renewal.date}</TableCell>
+                <TableCell className="font-medium">{renewal.userName}</TableCell>
+                <TableCell>{renewal.customerId}</TableCell>
+                <TableCell>₹{renewal.amount.toFixed(2)}</TableCell>
+                <TableCell>
+                  <Badge variant={renewal.status === 'Approved' ? 'secondary' : 'default'} className="bg-opacity-80">
+                    {renewal.status}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {renewal.status === 'Pending' && (
+                    <Button 
+                        size="sm"
+                        onClick={() => openApproveDialog(renewal)}
+                        disabled={isApproving}
+                    >
+                        Approve
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+       <CardFooter>
+        <div className="text-xs text-muted-foreground">
+          Showing <strong>1-{renewals?.length ?? 0}</strong> of <strong>{renewals?.length ?? 0}</strong> renewals
+        </div>
+      </CardFooter>
+    </Card>
+
+     <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Approve Renewal for {selectedRenewal?.userName}</AlertDialogTitle>
+            <AlertDialogDescription>
+                Select a new validity date to extend the user's subscription.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="validity-date" className="text-right">
+                        New Validity
+                    </Label>
+                    <div className="col-span-3">
+                        <DatePicker date={newValidityDate} setDate={setNewValidityDate} />
+                    </div>
+                </div>
+            </div>
+            <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleApproveRenewal} disabled={!newValidityDate || isApproving}>
+                {isApproving ? 'Approving...' : 'Approve & Extend'}
+            </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
+    </>
+  );
+}

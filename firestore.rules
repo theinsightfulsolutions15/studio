@@ -8,13 +8,13 @@
  *
  * Data Structure:
  * - `/users/{userId}`: Stores personal user data. Only the user themselves can read or write their own document.
- * - `/users/{userId}/amc_details/{amcDetailId}`: Stores AMC details specific to a user. Only the user can manage these details.
  * - `/animals/{animalId}`: Stores animal records. These are publicly readable, but only the creating user can modify or delete them.
  *   Each animal document MUST contain a denormalized `ownerId` field that matches the user who created it.
  * - `/animals/{animalId}/movements/{animalMovementId}`: Stores movement history for each animal. Inherits access control from the parent animal document.
  *   The existence of the parent document must be validated before allowing operations on the movement records.
  * - `/financial_records/{financialRecordId}`: Stores financial records. Publicly readable, but write access is restricted to the creating user.
  *   Each financial record MUST contain a denormalized `ownerId` field indicating the creator.
+ * - `/amc_renewals/{renewalId}`: Stores user-submitted AMC renewal requests. Readable by admins, writable by the user who owns it.
  * - `/roles_admin/{userId}`: Presence of a document in this collection grants the user admin privileges.
  *
  * Key Security Decisions:
@@ -57,26 +57,7 @@ service cloud.firestore {
     }
 
     /**
-     * @description Grants access to AMC details based on path-based ownership.
-     * @path /users/{userId}/amc_details/{amcDetailId}
-     * @allow (create) User with ID 'user123' can create AMC details under their profile.
-     *        request.auth.uid == 'user123'
-     * @allow (get) User with ID 'user123' can read AMC details under their profile.
-     *        request.auth.uid == 'user123'
-     * @allow (update) User with ID 'user123' can update AMC details under their profile.
-     *        request.auth.uid == 'user123'
-     * @allow (delete) User with ID 'user123' can delete AMC details under their profile.
-     *        request.auth.uid == 'user123'
-     * @deny (create) User with ID 'user456' cannot create AMC details under 'user123'.
-     *       request.auth.uid == 'user456'
-     * @principle Restricts access to a user's own data tree.
-     */
-    match /users/{userId}/amc_details/{amcDetailId} {
-      allow read, write: if isSignedIn() && (isOwner(userId) || isAdmin());
-    }
-
-    /**
-     * @description Grants public read access to animal records but restricts write access to the owner if not expired.
+     * @description Grants access to animal records but restricts write access to the owner if not expired.
      * @path /animals/{animalId}
      * @principle Enforces document ownership for writes, allows public reads.
      */
@@ -103,6 +84,17 @@ service cloud.firestore {
     match /financial_records/{financialRecordId} {
       allow get, list: if true;
       allow create, update, delete: if isSignedIn() && (isOwner(request.resource.data.ownerId) || isAdmin()) && !isExpired();
+    }
+
+    /**
+     * @description Rules for AMC renewal requests.
+     * @path /amc_renewals/{renewalId}
+     * @principle Users can create their own requests. Admins can read and update them.
+     */
+    match /amc_renewals/{renewalId} {
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && isOwner(request.resource.data.userId);
+      allow update: if isAdmin();
     }
 
     /**
@@ -160,7 +152,12 @@ service cloud.firestore {
             return false;
         }
         // Compare the validityDate string with the current time.
-        return userDoc.validityDate < request.time.toMillis().toString();
+        let validityMillis = timestamp.date(
+          int(userDoc.validityDate.split('-')[0]),
+          int(userDoc.validityDate.split('-')[1]),
+          int(userDoc.validityDate.split('-')[2])
+        ).toMillis();
+        return validityMillis < request.time.toMillis();
     }
   }
 }
