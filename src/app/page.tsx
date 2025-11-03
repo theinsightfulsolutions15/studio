@@ -8,29 +8,81 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Logo from "@/components/logo";
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore } from '@/firebase';
 import { initiateEmailSignIn } from '@/firebase/non-blocking-login';
+import { doc, getDoc } from 'firebase/firestore';
+import { signOut } from "firebase/auth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const auth = useAuth();
+  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      router.push('/dashboard');
+    if (user && !isUserLoading) {
+      setIsVerifying(true);
+      const userDocRef = doc(firestore, 'users', user.uid);
+      getDoc(userDocRef)
+        .then((docSnap) => {
+          if (docSnap.exists()) {
+            const userData = docSnap.data();
+            if (userData.status === 'Active' && (userData.role === 'Admin' || userData.role === 'User')) {
+              router.push('/dashboard');
+            } else {
+              let description = 'Your account requires admin approval.';
+              if (userData.status === 'Inactive') {
+                description = 'Your account is inactive. Please contact an administrator.';
+              }
+              toast({
+                variant: 'destructive',
+                title: 'Login Failed',
+                description: description,
+              });
+              signOut(auth);
+              setIsVerifying(false);
+            }
+          } else {
+            // This case should ideally not happen if signup is the only way to create an auth user
+            toast({
+              variant: 'destructive',
+              title: 'Login Failed',
+              description: 'No user record found. Please sign up.',
+            });
+            signOut(auth);
+            setIsVerifying(false);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching user data:", error);
+          toast({
+            variant: "destructive",
+            title: "Login Error",
+            description: "Could not verify your user status. Please try again.",
+          });
+          signOut(auth);
+          setIsVerifying(false);
+        });
     }
-  }, [user, router]);
+  }, [user, isUserLoading, auth, firestore, router, toast]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    setIsVerifying(true); // Show loading state immediately
     initiateEmailSignIn(auth, email, password);
   };
 
-  if (isUserLoading || user) {
-    return <div>Loading...</div>;
+  if (isUserLoading || isVerifying || user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div>Loading...</div>
+      </div>
+    );
   }
 
   return (
@@ -59,8 +111,8 @@ export default function LoginPage() {
                 </div>
                 <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
-              <Button type="submit" className="w-full">
-                Login
+              <Button type="submit" className="w-full" disabled={isVerifying}>
+                {isVerifying ? 'Verifying...' : 'Login'}
               </Button>
             </div>
           </form>
