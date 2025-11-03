@@ -39,9 +39,9 @@ function AnimalRowSkeleton() {
         <Skeleton className="h-16 w-16 rounded-md" />
       </TableCell>
       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
       <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
       <TableCell>
         <Skeleton className="h-8 w-8 rounded-md" />
       </TableCell>
@@ -57,17 +57,17 @@ export default function AnimalsPage() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
                 <CardTitle>Animals</CardTitle>
                 <CardDescription>Manage and track all animals in the Gaushala.</CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-                <div className="relative">
+            <div className="flex items-center gap-2 w-full md:w-auto">
+                <div className="relative flex-1 md:flex-initial">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search animals..." className="pl-8 sm:w-[300px]" />
+                    <Input placeholder="Search animals..." className="pl-8 w-full md:w-[250px] lg:w-[300px]" />
                 </div>
-                <Button>
+                <Button className="w-auto">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Register Animal
                 </Button>
@@ -80,9 +80,9 @@ export default function AnimalsPage() {
             <TableRow>
               <TableHead className="hidden w-[100px] sm:table-cell">Image</TableHead>
               <TableHead>Tag No.</TableHead>
-              <TableHead>Breed</TableHead>
+              <TableHead className="hidden md:table-cell">Breed</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Entry Date</TableHead>
+              <TableHead className="hidden lg:table-cell">Entry Date</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -94,7 +94,7 @@ export default function AnimalsPage() {
               <TableRow key={animal.id}>
                 <TableCell className="hidden sm:table-cell">
                   <Image
-                    alt="Animal image"
+                    alt={animal.imageHint || 'Animal image'}
                     className="aspect-square rounded-md object-cover"
                     height="64"
                     src={animal.imageUrl || "https://picsum.photos/seed/placeholder/64/64"}
@@ -103,13 +103,13 @@ export default function AnimalsPage() {
                   />
                 </TableCell>
                 <TableCell className="font-medium">{animal.govtTagNo}</TableCell>
-                <TableCell>{animal.breed}</TableCell>
+                <TableCell className="hidden md:table-cell">{animal.breed}</TableCell>
                 <TableCell>
                   <Badge variant={animal.healthStatus === 'Healthy' ? 'secondary' : animal.healthStatus === 'Sick' ? 'destructive' : 'default'} className="bg-opacity-80">
                     {animal.healthStatus}
                   </Badge>
                 </TableCell>
-                <TableCell>{animal.entryDate}</TableCell>
+                <TableCell className="hidden lg:table-cell">{animal.entryDate}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

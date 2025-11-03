@@ -25,7 +25,7 @@ export default function FinancePage() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
                 <CardTitle>Financial Records</CardTitle>
                 <CardDescription>Track all receipts, payments, and expenses.</CardDescription>
@@ -37,8 +37,8 @@ export default function FinancePage() {
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="all">
-          <TabsList>
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="receipts">Receipts</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
@@ -75,8 +75,8 @@ function TransactionsTable({ data }: { data: typeof financialData }) {
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Description</TableHead>
+              <TableHead className="hidden sm:table-cell">Category</TableHead>
+              <TableHead className="hidden md:table-cell">Description</TableHead>
               <TableHead className="text-right">Amount (₹)</TableHead>
             </TableRow>
           </TableHeader>
@@ -89,8 +89,8 @@ function TransactionsTable({ data }: { data: typeof financialData }) {
                     {record.type}
                   </Badge>
                 </TableCell>
-                <TableCell>{record.category}</TableCell>
-                <TableCell className="max-w-[300px] truncate">{record.description}</TableCell>
+                <TableCell className="hidden sm:table-cell">{record.category}</TableCell>
+                <TableCell className="hidden md:table-cell max-w-[200px] lg:max-w-[300px] truncate">{record.description}</TableCell>
                 <TableCell className="text-right font-medium">{record.amount.toFixed(2)}</TableCell>
               </TableRow>
             ))}

@@ -41,13 +41,13 @@ function UserRowSkeleton() {
           <Skeleton className="h-10 w-10 rounded-full" />
           <div className="space-y-2">
             <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-3 w-32" />
+            <Skeleton className="h-3 w-32 hidden sm:block" />
           </div>
         </div>
       </TableCell>
-      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+      <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-16" /></TableCell>
       <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
       <TableCell>
         <Skeleton className="h-8 w-8 rounded-md" />
       </TableCell>
@@ -64,7 +64,7 @@ export default function UsersPage() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
                 <CardTitle>User Management</CardTitle>
                 <CardDescription>Manage user accounts and roles.</CardDescription>
@@ -80,9 +80,9 @@ export default function UsersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>User</TableHead>
-              <TableHead>Role</TableHead>
+              <TableHead className="hidden md:table-cell">Role</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Signup Date</TableHead>
+              <TableHead className="hidden lg:table-cell">Signup Date</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -95,21 +95,22 @@ export default function UsersPage() {
                 <TableCell>
                     <div className="flex items-center gap-3">
                         <Avatar>
-                            <AvatarImage src={`https://i.pravatar.cc/150?u=${user.email}`} alt={user.name} />
-                            <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                            <AvatarImage src={user.photoURL || `https://i.pravatar.cc/150?u=${user.email}`} alt={user.name} />
+                            <AvatarFallback>{user.name?.charAt(0)}</AvatarFallback>
                         </Avatar>
-                        <div className="font-medium">{user.name}
-                            <div className="text-sm text-muted-foreground">{user.email}</div>
+                        <div className="font-medium truncate">
+                            {user.name}
+                            <div className="text-sm text-muted-foreground truncate hidden sm:block">{user.email}</div>
                         </div>
                     </div>
                 </TableCell>
-                <TableCell>{user.role}</TableCell>
+                <TableCell className="hidden md:table-cell">{user.role}</TableCell>
                 <TableCell>
                   <Badge variant={user.status === 'Active' ? 'secondary' : user.status === 'Pending' ? 'default' : 'destructive'} className="bg-opacity-80">
                     {user.status}
                   </Badge>
                 </TableCell>
-                <TableCell>{user.signupDate}</TableCell>
+                <TableCell className="hidden lg:table-cell">{user.signupDate}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

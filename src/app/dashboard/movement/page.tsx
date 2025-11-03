@@ -72,7 +72,7 @@ function MovementsTable({ movements, isLoading }: { movements: AnimalMovement[] 
                         {movement.type}
                     </Badge>
                 </TableCell>
-                <TableCell className="hidden md:table-cell max-w-[300px] truncate">{movement.reason}</TableCell>
+                <TableCell className="hidden md:table-cell max-w-[200px] lg:max-w-[300px] truncate">{movement.reason}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -108,7 +108,7 @@ export default function MovementPage() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
                 <CardTitle>Animal Movement</CardTitle>
                 <CardDescription>Track animal entry and exit records.</CardDescription>
@@ -120,8 +120,8 @@ export default function MovementPage() {
         </div>
       </CardHeader>
       <CardContent>
-         <Tabs defaultValue="all">
-          <TabsList>
+         <Tabs defaultValue="all" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="entries">Entries</TabsTrigger>
             <TabsTrigger value="exits">Exits</TabsTrigger>
