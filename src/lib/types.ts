@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 
 export type Animal = {
   id: string;
+  ownerId?: string;
   govtTagNo: string;
   tagColor: 'Yellow' | 'Blue' | 'Green' | 'Red';
   breed: 'Gir' | 'Sahiwal' | 'Red Sindhi' | 'Murrah' | 'Other';
@@ -13,7 +14,6 @@ export type Animal = {
   reasonForEntry: string;
   exitDate?: string;
   reasonForExit?: string;
-  ownerId?: string;
 };
 
 export type User = {
@@ -25,7 +25,9 @@ export type User = {
   signupDate: string;
   customerId?: string;
   photoURL?: string;
-  validityDate?: string; // Added validityDate
+  validityDate?: string;
+  address?: string;
+  mobileNo?: string;
 };
 
 export type FinancialRecord = {

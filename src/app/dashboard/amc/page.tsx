@@ -36,6 +36,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 function RenewalRowSkeleton() {
   return (
@@ -52,7 +53,7 @@ function RenewalRowSkeleton() {
 
 export default function AmcRenewalsPage() {
   const firestore = useFirestore();
-  const { user: authUser } = useUser();
+  const { user: authUser, isUserLoading: isAuthUserLoading } = useUser();
   const { toast } = useToast();
   
   const [selectedRenewal, setSelectedRenewal] = useState<AmcRenewal | null>(null);
@@ -70,7 +71,6 @@ export default function AmcRenewalsPage() {
   const isAdmin = currentUser?.role === 'Admin';
 
   const renewalsCollection = useMemoFirebase(() => {
-    // Only fetch if the user is an admin
     if (!isAdmin || !firestore) return null;
     return collection(firestore, 'amc_renewals')
   }, [isAdmin, firestore]);
@@ -97,12 +97,11 @@ export default function AmcRenewalsPage() {
       const userDocRef = doc(firestore, 'users', selectedRenewal.userId);
       const renewalDocRef = doc(firestore, 'amc_renewals', selectedRenewal.id);
 
-      await updateDoc(userDocRef, {
+      await updateDocumentNonBlocking(userDocRef, {
         validityDate: newValidityDate.toISOString().split('T')[0],
-        status: 'Active',
       });
 
-      await updateDoc(renewalDocRef, {
+      await updateDocumentNonBlocking(renewalDocRef, {
         status: 'Approved',
       });
 
@@ -126,7 +125,7 @@ export default function AmcRenewalsPage() {
     }
   };
 
-  if (isUserLoading) {
+  if (isAuthUserLoading || isUserLoading) {
      return (
          <Card>
             <CardHeader>
@@ -212,10 +211,13 @@ export default function AmcRenewalsPage() {
             ))}
           </TableBody>
         </Table>
+        {renewals && renewals.length === 0 && (
+          <div className="text-center py-10 text-muted-foreground">No pending renewals found.</div>
+        )}
       </CardContent>
        <CardFooter>
         <div className="text-xs text-muted-foreground">
-          Showing <strong>1-{renewals?.length ?? 0}</strong> of <strong>{renewals?.length ?? 0}</strong> renewals
+          Showing <strong>{renewals?.length ?? 0}</strong> of <strong>{renewals?.length ?? 0}</strong> renewals
         </div>
       </CardFooter>
     </Card>
@@ -246,7 +248,6 @@ export default function AmcRenewalsPage() {
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
-
     </>
   );
 }

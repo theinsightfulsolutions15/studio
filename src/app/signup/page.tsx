@@ -13,6 +13,28 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from "@/hooks/use-toast";
+import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
+
+// Helper function to get the next customer ID
+async function getNextCustomerId(firestore: any): Promise<string> {
+    const usersRef = collection(firestore, 'users');
+    const q = query(usersRef, where('customerId', '!=', ''));
+    const querySnapshot = await getDocs(q);
+    let maxId = 0;
+    if (!querySnapshot.empty) {
+        querySnapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.customerId && data.customerId.startsWith('G-')) {
+                const idNumber = parseInt(data.customerId.substring(2), 10);
+                if (!isNaN(idNumber) && idNumber > maxId) {
+                    maxId = idNumber;
+                }
+            }
+        });
+    }
+    return `G-${(maxId + 1).toString().padStart(3, '0')}`;
+}
+
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState('');
@@ -27,6 +49,10 @@ export default function SignupPage() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!auth || !firestore) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Firebase not initialized.'})
+        return;
+    }
     setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -36,6 +62,11 @@ export default function SignupPage() {
       
       const isAdmin = email === 'theinsightfulsolutions@gmail.com';
       
+      let customerId = '';
+      if (isAdmin) {
+          customerId = await getNextCustomerId(firestore);
+      }
+
       const userData = {
         id: user.uid,
         name: fullName,
@@ -45,13 +76,14 @@ export default function SignupPage() {
         signupDate: new Date().toISOString().split('T')[0],
         address: '',
         mobileNo: '',
-        customerId: '', // Initialize customerId as empty
+        customerId: customerId, // Assign customerId for admin, empty for others
+        validityDate: isAdmin ? '2099-12-31' : '', // Give admin a far future validity date
       };
-      setDocumentNonBlocking(userRef, userData, { merge: true });
+      await setDocumentNonBlocking(userRef, userData, { merge: true });
 
       if (isAdmin) {
         const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
-        setDocumentNonBlocking(adminRoleRef, { uid: user.uid }, { merge: true });
+        await setDocumentNonBlocking(adminRoleRef, { uid: user.uid }, { merge: true });
         toast({
           title: "Admin Account Created",
           description: "Your admin account has been successfully created.",

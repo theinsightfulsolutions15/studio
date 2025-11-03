@@ -39,13 +39,15 @@ import { Button } from '@/components/ui/button';
 import { MoreHorizontal, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, doc, updateDoc, getDocs, query as firestoreQuery, where } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+
 
 // Helper function to generate the next customer ID
 const getNextCustomerId = (users: AppUser[] | null): string => {
@@ -93,7 +95,7 @@ function UserRowSkeleton() {
 
 export default function UsersPage() {
   const firestore = useFirestore();
-  const { user: authUser } = useUser();
+  const { user: authUser, isUserLoading: isAuthUserLoading } = useUser();
   const { toast } = useToast();
   const [isApproving, setIsApproving] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
@@ -128,13 +130,10 @@ export default function UsersPage() {
     }
     setIsApproving(selectedUser.id);
     try {
-        const usersSnapshot = await getDocs(collection(firestore, 'users'));
-        const allUsers: AppUser[] = usersSnapshot.docs.map(d => d.data() as AppUser);
+        const newCustomerId = getNextCustomerId(users);
+        const userDocToUpdateRef = doc(firestore, 'users', selectedUser.id);
 
-        const newCustomerId = getNextCustomerId(allUsers);
-        const userDocRef = doc(firestore, 'users', selectedUser.id);
-
-        await updateDoc(userDocRef, {
+        await updateDocumentNonBlocking(userDocToUpdateRef, {
             status: 'Active',
             customerId: newCustomerId,
             validityDate: validityDate.toISOString().split('T')[0],
@@ -164,7 +163,7 @@ export default function UsersPage() {
     setDialogOpen(true);
   }
 
-  if (isUserLoading) {
+  if (isUserLoading || isAuthUserLoading) {
       return <Card><CardHeader><CardTitle>Loading...</CardTitle></CardHeader></Card>
   }
   

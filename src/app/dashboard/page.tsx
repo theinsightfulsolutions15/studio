@@ -26,17 +26,17 @@ import {
 } from 'lucide-react';
 import { monthlyChartData } from '@/lib/placeholder-data';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, serverTimestamp } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
-import { useState } from 'react';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
 import { DatePicker } from '@/components/ui/date-picker';
+import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import type { User as AppUser } from '@/lib/types';
 
 
 const chartConfig = {
@@ -51,7 +51,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 function AmcRenewalForm() {
-    const { user } = useUser();
+    const { user, isUserLoading } = useUser() as { user: (AppUser & { uid: string }) | null, isUserLoading: boolean };
     const firestore = useFirestore();
     const { toast } = useToast();
     const [amount, setAmount] = useState<number | ''>('');
@@ -75,7 +75,7 @@ function AmcRenewalForm() {
         try {
             await addDocumentNonBlocking(amcCollectionRef, {
                 userId: user.uid,
-                userName: user.displayName || user.email,
+                userName: user.name || user.email,
                 customerId: user.customerId,
                 amount,
                 transactionType,
@@ -137,7 +137,7 @@ function AmcRenewalForm() {
                             </SelectContent>
                         </Select>
                     </div>
-                    <Button onClick={handleSubmit} disabled={isSubmitting} className="w-full sm:w-auto">
+                    <Button onClick={handleSubmit} disabled={isSubmitting || isUserLoading} className="w-full sm:w-auto">
                         {isSubmitting ? 'Submitting...' : 'Submit for Renewal'}
                     </Button>
                 </div>
@@ -147,14 +147,24 @@ function AmcRenewalForm() {
 }
 
 export default function Dashboard() {
-  const { user, isUserLoading } = useUser();
-  
-  const isExpired = user?.status === 'Expired';
+  const { user, isUserLoading } = useUser() as { user: (AppUser & { uid: string }) | null, isUserLoading: boolean };
+  const [isExpired, setIsExpired] = useState(false);
+
+  useEffect(() => {
+    if (user && user.validityDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Compare dates only, not time
+      const validity = new Date(user.validityDate);
+      setIsExpired(validity < today);
+    } else {
+      setIsExpired(false);
+    }
+  }, [user]);
 
 
   return (
     <div className="space-y-6">
-      {isExpired && <AmcRenewalForm />}
+      {isExpired && !isUserLoading && <AmcRenewalForm />}
       <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
       
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
