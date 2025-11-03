@@ -24,9 +24,17 @@ export default function SettingsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
+  const userDocRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(firestore, `users/${user.uid}`);
+  }, [user, firestore]);
+
+  const { data: userData, isLoading: isUserDocLoading } = useDoc(userDocRef);
+
   // User Profile state
-  const [gaushalaName, setGaushalaName] = useState('Shri Krishna Gaushala');
-  const [address, setAddress] = useState('Vrindavan, Mathura, Uttar Pradesh');
+  const [displayName, setDisplayName] = useState('');
+  const [address, setAddress] = useState('');
+  const [mobileNo, setMobileNo] = useState('');
 
   // AMC Details state
   const [amcProvider, setAmcProvider] = useState('');
@@ -42,6 +50,16 @@ export default function SettingsPage() {
   const { data: amcData, isLoading: isAmcLoading } = useDoc(amcDetailsRef);
 
   useEffect(() => {
+    if (userData) {
+      setDisplayName(userData.name || user?.displayName || '');
+      setAddress(userData.address || '');
+      setMobileNo(userData.mobileNo || '');
+    } else if (user) {
+      setDisplayName(user.displayName || '');
+    }
+  }, [userData, user]);
+
+  useEffect(() => {
     if (amcData) {
       setAmcProvider(amcData.providerName || '');
       setAmcExpiry(amcData.endDate?.split('T')[0] || '');
@@ -51,9 +69,19 @@ export default function SettingsPage() {
 
 
   const handleProfileSave = () => {
+     if (!userDocRef) {
+        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to update your profile.' });
+        return;
+    }
+    const profileData = {
+        name: displayName,
+        address,
+        mobileNo,
+    };
+    setDocumentNonBlocking(userDocRef, profileData, { merge: true });
     toast({
       title: "Success",
-      description: "Gaushala profile updated successfully. (This is a demo and not saved to the database)",
+      description: "Profile updated successfully.",
     });
   };
 
@@ -76,6 +104,8 @@ export default function SettingsPage() {
     });
   };
 
+  const isLoading = isUserLoading || isUserDocLoading;
+
   return (
     <div className="space-y-6">
         <h1 className="text-3xl font-bold font-headline">Settings</h1>
@@ -83,17 +113,34 @@ export default function SettingsPage() {
         <Card>
             <CardHeader>
                 <CardTitle>User Profile</CardTitle>
-                <CardDescription>This is your account information.</CardDescription>
+                <CardDescription>This is your account information. Click save to update.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                 <div className="space-y-2">
-                    <Label htmlFor="user-name">Your Name</Label>
-                    {isUserLoading ? <Skeleton className="h-10 w-full" /> : <Input id="user-name" value={user?.displayName || ''} readOnly disabled />}
+                 <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="user-name">Your Name</Label>
+                        {isLoading ? <Skeleton className="h-10 w-full" /> : <Input id="user-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />}
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="user-email">Your Email</Label>
+                        {isLoading ? <Skeleton className="h-10 w-full" /> : <Input id="user-email" value={user?.email || ''} readOnly disabled />}
+                    </div>
+                </div>
+                 <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="user-mobile">Mobile No.</Label>
+                        {isLoading ? <Skeleton className="h-10 w-full" /> : <Input id="user-mobile" value={mobileNo} onChange={(e) => setMobileNo(e.target.value)} />}
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="user-role">Role</Label>
+                        {isLoading ? <Skeleton className="h-10 w-full" /> : <Input id="user-role" value={userData?.role || ''} readOnly disabled />}
+                    </div>
                 </div>
                  <div className="space-y-2">
-                    <Label htmlFor="user-email">Your Email</Label>
-                    {isUserLoading ? <Skeleton className="h-10 w-full" /> : <Input id="user-email" value={user?.email || ''} readOnly disabled />}
+                    <Label htmlFor="address">Address</Label>
+                    {isLoading ? <Skeleton className="h-20 w-full" /> : <Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} />}
                 </div>
+                <Button onClick={handleProfileSave} disabled={isLoading}>Save Changes</Button>
             </CardContent>
         </Card>
         
@@ -156,18 +203,18 @@ export default function SettingsPage() {
          <Card>
             <CardHeader>
                 <CardTitle>Gaushala Profile</CardTitle>
-                <CardDescription>Update your Gaushala's information (demo only).</CardDescription>
+                <CardDescription>This section is for demo purposes and is not connected to the database.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                  <div className="space-y-2">
                     <Label htmlFor="gaushala-name">Gaushala Name</Label>
-                    <Input id="gaushala-name" value={gaushalaName} onChange={(e) => setGaushalaName(e.target.value)} />
+                    <Input id="gaushala-name" defaultValue="Shri Krishna Gaushala" />
                 </div>
                  <div className="space-y-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} />
+                    <Label htmlFor="g-address">Address</Label>
+                    <Textarea id="g-address" defaultValue="Vrindavan, Mathura, Uttar Pradesh" />
                 </div>
-                <Button onClick={handleProfileSave}>Save Changes</Button>
+                <Button onClick={() => toast({ title: 'Demo', description: 'This is a demo feature.'})}>Save Changes</Button>
             </CardContent>
         </Card>
     </div>

@@ -40,6 +40,8 @@ export default function SignupPage() {
         role: isAdmin ? 'Admin' : 'User',
         status: isAdmin ? 'Active' : 'Pending',
         signupDate: new Date().toISOString().split('T')[0],
+        address: '',
+        mobileNo: ''
       };
       setDocumentNonBlocking(userRef, userData, { merge: true });
 

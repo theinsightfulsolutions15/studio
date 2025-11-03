@@ -154,6 +154,14 @@
         "isActive": {
           "type": "boolean",
           "description": "Indicates whether the user account is active."
+        },
+        "address": {
+          "type": "string",
+          "description": "The user's address."
+        },
+        "mobileNo": {
+          "type": "string",
+          "description": "The user's mobile phone number."
         }
       },
       "required": [
