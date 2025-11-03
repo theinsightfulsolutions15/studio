@@ -25,8 +25,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, PlusCircle } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collectionGroup, query } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { collectionGroup, query, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
 import type { AnimalMovement } from '@/lib/types';
@@ -96,11 +96,12 @@ function MovementsTable({ movements, isLoading }: { movements: AnimalMovement[] 
 
 export default function MovementPage() {
   const firestore = useFirestore();
+  const { user } = useUser();
   
   const movementsQuery = useMemoFirebase(() => {
-      if (!firestore) return null;
+      if (!firestore || !user) return null;
       return query(collectionGroup(firestore, 'movements'));
-  }, [firestore]);
+  }, [firestore, user]);
 
   const { data: allMovements, isLoading: isLoadingAll, error } = useCollection<AnimalMovement>(movementsQuery);
 
@@ -110,13 +111,18 @@ export default function MovementPage() {
   const [isLoadingExit, setIsLoadingExit] = useState(true);
   
   useEffect(() => {
+    if (isLoadingAll) {
+        setIsLoadingEntry(true);
+        setIsLoadingExit(true);
+        return;
+    }
     if (allMovements) {
         setEntryMovements(allMovements.filter(m => m.type === 'Entry'));
         setExitMovements(allMovements.filter(m => m.type === 'Exit'));
-        setIsLoadingEntry(false);
-        setIsLoadingExit(false);
     }
-  }, [allMovements]);
+    setIsLoadingEntry(false);
+    setIsLoadingExit(false);
+  }, [allMovements, isLoadingAll]);
 
 
   return (

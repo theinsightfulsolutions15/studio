@@ -60,7 +60,11 @@ export default function AmcRenewalsPage() {
   const [isApproving, setIsApproving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const renewalsCollection = useMemoFirebase(() => collection(firestore, 'amc_renewals'), [firestore]);
+  const renewalsCollection = useMemoFirebase(() => {
+    if (!currentUser || !firestore) return null;
+    return collection(firestore, 'amc_renewals')
+  }, [currentUser, firestore]);
+
   const { data: renewals, isLoading } = useCollection<AmcRenewal>(renewalsCollection);
 
   const isAdmin = currentUser?.role === 'Admin';
@@ -144,7 +148,7 @@ export default function AmcRenewalsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && Array.from({ length: 5 }).map((_, i) => <RenewalRowSkeleton key={i} />)}
+            {(isLoading || !currentUser) && Array.from({ length: 5 }).map((_, i) => <RenewalRowSkeleton key={i} />)}
             {renewals?.map((renewal) => (
               <TableRow key={renewal.id}>
                 <TableCell>{renewal.date}</TableCell>

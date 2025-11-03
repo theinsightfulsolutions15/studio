@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MoreHorizontal, PlusCircle, Search } from 'lucide-react';
 import Image from 'next/image';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import type { Animal } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -51,7 +51,13 @@ function AnimalRowSkeleton() {
 
 export default function AnimalsPage() {
   const firestore = useFirestore();
-  const animalsCollection = useMemoFirebase(() => collection(firestore, 'animals'), [firestore]);
+  const { user } = useUser();
+
+  const animalsCollection = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, 'animals');
+  }, [user, firestore]);
+  
   const { data: animals, isLoading } = useCollection<Animal>(animalsCollection);
 
   return (
@@ -89,7 +95,7 @@ export default function AnimalsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && Array.from({ length: 5 }).map((_, i) => <AnimalRowSkeleton key={i} />)}
+            {(isLoading || !user) && Array.from({ length: 5 }).map((_, i) => <AnimalRowSkeleton key={i} />)}
             {animals?.map((animal) => (
               <TableRow key={animal.id}>
                 <TableCell className="hidden sm:table-cell">

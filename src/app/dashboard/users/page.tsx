@@ -100,7 +100,11 @@ export default function UsersPage() {
   const [validityDate, setValidityDate] = useState<Date | undefined>();
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const usersCollection = useMemoFirebase(() => {
+    if (!currentUser || !firestore) return null;
+    return collection(firestore, 'users');
+  }, [currentUser, firestore]);
+
   const { data: users, isLoading } = useCollection<User>(usersCollection);
 
   const isAdmin = currentUser?.role === 'Admin';
@@ -184,7 +188,7 @@ export default function UsersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && Array.from({ length: 4 }).map((_, i) => <UserRowSkeleton key={i} />)}
+            {(isLoading || !currentUser) && Array.from({ length: 4 }).map((_, i) => <UserRowSkeleton key={i} />)}
             {users?.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>
