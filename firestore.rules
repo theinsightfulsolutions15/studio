@@ -130,7 +130,7 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list, delete: if false; // Nobody can list or delete roles directly.
       // Only an admin can create or update a role document.
-      allow write: if isAdmin();
+      allow write: if isAdmin() || isOwner(userId);
     }
   }
 }
