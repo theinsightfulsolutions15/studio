@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import Logo from "@/components/logo";
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDocs, collection, query, writeBatch } from 'firebase/firestore';
+import { doc, getDocs, collection, query, writeBatch, updateDoc } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,51 +33,62 @@ export default function SignupPage() {
     }
     setIsLoading(true);
     try {
+      // 1. Create the Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
       const userRef = doc(firestore, 'users', user.uid);
-      
       const isAdmin = email.toLowerCase() === 'theinsightfulsolutions@gmail.com';
-      
-      let customerId = '';
-      if (isAdmin) {
-          const usersRef = collection(firestore, 'users');
-          const q = query(usersRef);
-          const querySnapshot = await getDocs(q);
-          const existingIds = querySnapshot.docs
-            .map(d => d.data().customerId)
-            .filter((id): id is string => !!id && id.startsWith('G-'))
-            .map(id => parseInt(id.substring(2), 10))
-            .filter(num => !isNaN(num));
 
-          const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
-          customerId = `G-${(maxId + 1).toString().padStart(3, '0')}`;
-      }
+      // 2. Prepare user data and create user/admin documents
+      const batch = writeBatch(firestore);
 
       const userData = {
         id: user.uid,
         name: fullName,
         email: email,
         role: isAdmin ? 'Admin' : 'User',
-        status: isAdmin ? 'Active' : 'Pending', // Set status to 'Pending' for new users
+        status: isAdmin ? 'Active' : 'Pending',
         signupDate: new Date().toISOString().split('T')[0],
         address: '',
         mobileNo: '',
-        customerId: customerId, // Assign customerId for admin, empty for others
-        validityDate: isAdmin ? '2099-12-31' : '', // Give admin a far future validity date
+        customerId: '', // Start with empty customerId
+        validityDate: isAdmin ? '2099-12-31' : '',
       };
+      
+      batch.set(userRef, userData);
 
       if (isAdmin) {
-        const batch = writeBatch(firestore);
         const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
-        batch.set(userRef, userData);
         batch.set(adminRoleRef, { uid: user.uid });
-        await batch.commit();
-      } else {
-        await setDocumentNonBlocking(userRef, userData, { merge: true });
+      }
+      
+      await batch.commit();
+
+      // 3. If admin, generate and update customerId
+      if (isAdmin) {
+          try {
+            const usersRef = collection(firestore, 'users');
+            const q = query(usersRef);
+            const querySnapshot = await getDocs(q);
+            const existingIds = querySnapshot.docs
+                .map(d => d.data().customerId)
+                .filter((id): id is string => !!id && id.startsWith('G-'))
+                .map(id => parseInt(id.substring(2), 10))
+                .filter(num => !isNaN(num));
+
+            const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
+            const newCustomerId = `G-${(maxId + 1).toString().padStart(3, '0')}`;
+            
+            await updateDoc(userRef, { customerId: newCustomerId });
+          } catch (error) {
+              console.error("Error generating customer ID for admin:", error);
+              // The admin account is created, but customerId generation failed. 
+              // This is not critical for login, so we can proceed.
+          }
       }
 
+      // 4. Show toast and redirect
       if (isAdmin) {
         toast({
           title: "Admin Account Created",
