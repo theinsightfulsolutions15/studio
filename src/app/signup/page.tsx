@@ -11,8 +11,7 @@ import { Label } from "@/components/ui/label";
 import Logo from "@/components/logo";
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDocs, collection, query, writeBatch, updateDoc } from 'firebase/firestore';
-import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { doc, writeBatch } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 
 export default function SignupPage() {
@@ -40,7 +39,7 @@ export default function SignupPage() {
       const userRef = doc(firestore, 'users', user.uid);
       const isAdmin = email.toLowerCase() === 'theinsightfulsolutions@gmail.com';
 
-      // 2. Prepare user data and create user/admin documents
+      // 2. Prepare user data and create user/admin documents in a batch
       const batch = writeBatch(firestore);
 
       const userData = {
@@ -52,47 +51,27 @@ export default function SignupPage() {
         signupDate: new Date().toISOString().split('T')[0],
         address: '',
         mobileNo: '',
-        customerId: '', // Start with empty customerId
+        // Set customerId and validityDate based on role
+        customerId: isAdmin ? 'G-001' : '', 
         validityDate: isAdmin ? '2099-12-31' : '',
       };
       
       batch.set(userRef, userData);
 
+      // If user is an admin, also add them to the roles_admin collection
       if (isAdmin) {
         const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
         batch.set(adminRoleRef, { uid: user.uid });
       }
       
+      // 3. Commit the batch write
       await batch.commit();
 
-      // 3. If admin, generate and update customerId
-      if (isAdmin) {
-          try {
-            const usersRef = collection(firestore, 'users');
-            const q = query(usersRef);
-            const querySnapshot = await getDocs(q);
-            const existingIds = querySnapshot.docs
-                .map(d => d.data().customerId)
-                .filter((id): id is string => !!id && id.startsWith('G-'))
-                .map(id => parseInt(id.substring(2), 10))
-                .filter(num => !isNaN(num));
-
-            const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
-            const newCustomerId = `G-${(maxId + 1).toString().padStart(3, '0')}`;
-            
-            await updateDoc(userRef, { customerId: newCustomerId });
-          } catch (error) {
-              console.error("Error generating customer ID for admin:", error);
-              // The admin account is created, but customerId generation failed. 
-              // This is not critical for login, so we can proceed.
-          }
-      }
-
-      // 4. Show toast and redirect
+      // 4. Show appropriate toast message and redirect
       if (isAdmin) {
         toast({
           title: "Admin Account Created",
-          description: "Your admin account has been successfully created.",
+          description: "Your admin account has been successfully created with Customer ID G-001.",
         });
       } else {
         toast({
