@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from "next/link";
@@ -8,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Logo from "@/components/logo";
-import { useAuth, useUser, useFirestore } from '@/firebase';
+import { useAuth, useUser, useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { initiateEmailSignIn } from '@/firebase/non-blocking-login';
 import { doc, getDoc } from 'firebase/firestore';
 import { signOut } from "firebase/auth";
@@ -25,7 +26,7 @@ export default function LoginPage() {
   const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
-    if (user && !isUserLoading) {
+    if (user && !isUserLoading && firestore && auth) {
       setIsVerifying(true);
       const userDocRef = doc(firestore, 'users', user.uid);
       getDoc(userDocRef)
@@ -36,8 +37,8 @@ export default function LoginPage() {
               router.push('/dashboard');
             } else {
               let description = 'Your account requires admin approval.';
-              if (userData.status === 'Inactive') {
-                description = 'Your account is inactive. Please contact an administrator.';
+              if (userData.status === 'Inactive' || userData.status === 'Expired') {
+                description = 'Your account is inactive or expired. Please contact an administrator.';
               }
               toast({
                 variant: 'destructive',
@@ -58,29 +59,38 @@ export default function LoginPage() {
             setIsVerifying(false);
           }
         })
-        .catch((error) => {
-          console.error("Error fetching user data:", error);
-          toast({
-            variant: "destructive",
-            title: "Login Error",
-            description: "Could not verify your user status. Please try again.",
-          });
-          signOut(auth);
-          setIsVerifying(false);
+        .catch((serverError) => {
+            const contextualError = new FirestorePermissionError({
+              path: userDocRef.path,
+              operation: 'get',
+            });
+            errorEmitter.emit('permission-error', contextualError);
+            setIsVerifying(false);
         });
     }
   }, [user, isUserLoading, auth, firestore, router, toast]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!auth) {
+        toast({
+            variant: "destructive",
+            title: "Login Error",
+            description: "Authentication service is not available.",
+        });
+        return;
+    }
     setIsVerifying(true); // Show loading state immediately
     initiateEmailSignIn(auth, email, password);
   };
 
   if (isUserLoading || isVerifying || user) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div>Loading...</div>
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <p className="text-lg font-semibold">GauRakshak</p>
+          <p className="text-muted-foreground">Verifying your credentials, please wait...</p>
+        </div>
       </div>
     );
   }
