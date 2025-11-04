@@ -120,15 +120,17 @@ service cloud.firestore {
       // Users can create their own renewal requests.
       allow create: if isSignedIn() && isOwner(request.resource.data.userId);
       // Admins can read, list, update, or delete renewal requests.
-      allow read, list, update, delete: if isAdmin();
+      allow list, read, update, delete: if isAdmin();
     }
 
     /**
-     * Rules for admin roles collection. Read-only.
+     * Rules for admin roles collection. Read-only for most, writable only by admins.
      */
     match /roles_admin/{userId} {
       allow get: if isSignedIn();
-      allow list, create, update, delete: if false; // Nobody can modify this collection directly.
+      allow list, delete: if false; // Nobody can list or delete roles directly.
+      // Only an admin can create or update a role document.
+      allow write: if isAdmin();
     }
   }
 }

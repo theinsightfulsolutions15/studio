@@ -11,31 +11,9 @@ import { Label } from "@/components/ui/label";
 import Logo from "@/components/logo";
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDocs, collection, query, where } from 'firebase/firestore';
+import { doc, getDocs, collection, query, writeBatch } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from "@/hooks/use-toast";
-
-
-// Helper function to get the next customer ID
-async function getNextCustomerId(firestore: any): Promise<string> {
-    const usersRef = collection(firestore, 'users');
-    const q = query(usersRef, where('customerId', '!=', ''));
-    const querySnapshot = await getDocs(q);
-    let maxId = 0;
-    if (!querySnapshot.empty) {
-        querySnapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.customerId && data.customerId.startsWith('G-')) {
-                const idNumber = parseInt(data.customerId.substring(2), 10);
-                if (!isNaN(idNumber) && idNumber > maxId) {
-                    maxId = idNumber;
-                }
-            }
-        });
-    }
-    return `G-${(maxId + 1).toString().padStart(3, '0')}`;
-}
-
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState('');
@@ -46,7 +24,6 @@ export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +42,17 @@ export default function SignupPage() {
       
       let customerId = '';
       if (isAdmin) {
-          customerId = await getNextCustomerId(firestore);
+          const usersRef = collection(firestore, 'users');
+          const q = query(usersRef);
+          const querySnapshot = await getDocs(q);
+          const existingIds = querySnapshot.docs
+            .map(d => d.data().customerId)
+            .filter((id): id is string => !!id && id.startsWith('G-'))
+            .map(id => parseInt(id.substring(2), 10))
+            .filter(num => !isNaN(num));
+
+          const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
+          customerId = `G-${(maxId + 1).toString().padStart(3, '0')}`;
       }
 
       const userData = {
@@ -80,12 +67,18 @@ export default function SignupPage() {
         customerId: customerId, // Assign customerId for admin, empty for others
         validityDate: isAdmin ? '2099-12-31' : '', // Give admin a far future validity date
       };
-      
-      await setDocumentNonBlocking(userRef, userData, { merge: true });
 
       if (isAdmin) {
+        const batch = writeBatch(firestore);
         const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
-        await setDocumentNonBlocking(adminRoleRef, { uid: user.uid }, { merge: true });
+        batch.set(userRef, userData);
+        batch.set(adminRoleRef, { uid: user.uid });
+        await batch.commit();
+      } else {
+        await setDocumentNonBlocking(userRef, userData, { merge: true });
+      }
+
+      if (isAdmin) {
         toast({
           title: "Admin Account Created",
           description: "Your admin account has been successfully created.",
@@ -104,6 +97,8 @@ export default function SignupPage() {
       let description = "An unexpected error occurred. Please try again.";
       if (error.code === 'auth/email-already-in-use') {
         description = 'This email address is already in use by another account.';
+      } else if (error.code === 'permission-denied') {
+        description = "You don't have permission to create an account. Please contact an administrator.";
       } else {
         description = error.message;
       }
