@@ -116,7 +116,7 @@ function AmcRenewalForm() {
                 </div>
             </CardHeader>
             <CardContent className="space-y-4">
-                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                 <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                     <div className="space-y-2">
                         <Label htmlFor="customerId">Customer ID</Label>
                         <Input id="customerId" value={user?.customerId || ''} disabled />
@@ -125,12 +125,6 @@ function AmcRenewalForm() {
                         <Label htmlFor="amount">Amount</Label>
                         <Input id="amount" type="number" placeholder="Enter amount" value={amount} onChange={e => setAmount(Number(e.target.value))} />
                     </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="transactionDate">Date</Label>
-                        <DatePicker date={transactionDate} setDate={setTransactionDate} />
-                    </div>
-                </div>
-                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
                     <div className="space-y-2">
                         <Label htmlFor="transactionType">Transaction Type</Label>
                         <Select onValueChange={setTransactionType} value={transactionType}>
@@ -146,6 +140,12 @@ function AmcRenewalForm() {
                             </SelectContent>
                         </Select>
                     </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="transactionDate">Date</Label>
+                        <DatePicker date={transactionDate} setDate={setTransactionDate} />
+                    </div>
+                </div>
+                 <div className="flex justify-end">
                     <Button onClick={handleSubmit} disabled={isSubmitting || isUserLoading} className="w-full sm:w-auto">
                         {isSubmitting ? 'Submitting...' : 'Submit for Renewal'}
                     </Button>
@@ -179,13 +179,18 @@ export default function Dashboard() {
         const validity = new Date(user.validityDate);
         validity.setHours(0, 0, 0, 0);
         setIsExpired(validity < today);
+      } else if (user.status !== 'Active' || user.role !== 'Admin') {
+        // If user is not admin and has no validity date, they might be pending or have an issue
+        // We assume non-admin users without a date are expired or pending. Admin is always active.
+        setIsExpired(true);
       } else {
         setIsExpired(false);
       }
-    } else {
+    } else if (!isUserDocLoading) {
+      // If there's no user data and we're not loading, they can't be expired (they might not exist or be pending)
       setIsExpired(false);
     }
-  }, [user]);
+  }, [user, isUserDocLoading]);
 
   const isLoading = isUserLoading || isUserDocLoading;
 
