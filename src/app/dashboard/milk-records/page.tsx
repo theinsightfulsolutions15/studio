@@ -45,7 +45,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlusCircle, ChevronsUpDown, Check, Trash2, Plus, Droplets, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, ChevronsUpDown, Check, Trash2, Plus, Droplets, MoreHorizontal, FileDown } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, query, writeBatch, doc, where } from 'firebase/firestore';
 import type { MilkRecord, Animal, AnimalMovement, FinancialRecord, Account, User as AppUser } from '@/lib/types';
@@ -315,7 +315,7 @@ export default function MilkRecordsPage() {
       }
   };
 
-  const generateSalePdf = (saleData: typeof milkSaleData) => {
+  const generateSalePdf = (saleData: FinancialRecord | typeof initialMilkSaleState) => {
     if (!userData) {
         toast({ variant: 'destructive', title: 'PDF Error', description: 'User profile not loaded.' });
         return;
@@ -375,7 +375,7 @@ export default function MilkRecordsPage() {
     doc.text(`₹${saleData.amount?.toFixed(2)}`, pageWidth - 14, currentY, { align: 'right'});
     
     // Download
-    doc.save(`Invoice_${saleData.invoiceNo || 'Sale'}_${saleData.date}.pdf`);
+    doc.save(`Invoice_${saleData.invoiceNo || 'Sale'}_${new Date(saleData.date!).toISOString().split('T')[0]}.pdf`);
   };
 
   const handleSaleSubmit = async () => {
@@ -412,7 +412,10 @@ export default function MilkRecordsPage() {
             const financialColRef = collection(firestore, `users/${user.uid}/financial_records`);
             await addDocumentNonBlocking(financialColRef, dataToSave);
             toast({ title: 'Success', description: 'Milk sale recorded successfully.'});
-            generateSalePdf(milkSaleData);
+            generateSalePdf({
+                ...dataToSave,
+                id: '',
+            });
         }
         
         setIsSalesDialogOpen(false);
@@ -656,6 +659,10 @@ export default function MilkRecordsPage() {
                                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                 <DropdownMenuContent>
                                                     <DropdownMenuItem onSelect={() => openSaleDialog(sale)}>Edit</DropdownMenuItem>
+                                                    <DropdownMenuItem onSelect={() => generateSalePdf(sale)}>
+                                                        <FileDown className="mr-2 h-4 w-4" />
+                                                        Download PDF
+                                                    </DropdownMenuItem>
                                                     <DropdownMenuItem onSelect={() => openDeleteSaleDialog(sale)} className="text-destructive">Delete</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
@@ -869,3 +876,5 @@ export default function MilkRecordsPage() {
     </>
   );
 }
+
+    
