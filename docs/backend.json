@@ -1,5 +1,22 @@
 {
   "entities": {
+    "GaushalaProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GaushalaProfile",
+      "type": "object",
+      "description": "Represents the central profile information for the Gaushala.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The official name of the Gaushala."
+        },
+        "address": {
+          "type": "string",
+          "description": "The physical address of the Gaushala."
+        }
+      },
+      "required": ["name", "address"]
+    },
     "Animal": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Animal",
@@ -371,8 +388,21 @@
             }
           ]
         }
+      },
+      {
+        "path": "/gaushala_profile/{profileId}",
+        "definition": {
+          "entityName": "GaushalaProfile",
+          "schema": { "$ref": "#/backend/entities/GaushalaProfile" },
+          "description": "Stores the single, central profile for the Gaushala. Admins can write, all users can read.",
+          "params": [
+            { "name": "profileId", "description": "A fixed ID for the Gaushala profile document, e.g., 'main'." }
+          ]
+        }
       }
     ],
     "reasoning": "The Firestore data structure is designed to support the GauRakshak application, focusing on secure and efficient data management for animal records, financial transactions, and user roles. The structure prioritizes authorization independence and facilitates simple, robust security rules. Path-based ownership is utilized for user-specific data, and membership maps are employed for collaborative data access.  The structure also incorporates segregation, with dedicated collections for animals and their movement history and financial records, to enforce homogeneous security postures and simplify security rules. Denormalization of user roles into related data collections ensures authorization independence, eliminating the need for `get()` calls in security rules. This ensures that security rules are atomic and easily debuggable. QAPs are achieved through clear separation of data based on ownership and role-based access control."
   }
 }
+
+    

@@ -17,6 +17,7 @@
  *   Each financial record MUST contain a denormalized `ownerId` field indicating the creator.
  * - `/amc_renewals/{renewalId}`: Stores user-submitted AMC renewal requests. Readable by admins, writable by the user who owns it.
  * - `/roles_admin/{userId}`: Presence of a document in this collection grants the user admin privileges.
+ * - `/gaushala_profile/{profileId}`: Stores the central profile for the Gaushala.
  *
  * Key Security Decisions:
  * - User listing is explicitly disallowed for non-admins.
@@ -140,5 +141,17 @@ service cloud.firestore {
       // Nobody can delete roles.
       allow delete: if false;
     }
+
+     /**
+     * Rules for the Gaushala Profile.
+     */
+    match /gaushala_profile/{profileId} {
+      // All signed-in users can read the profile.
+      allow read: if isSignedIn();
+      // Only admins can create or update the profile.
+      allow write: if isAdmin();
+    }
   }
 }
+
+    

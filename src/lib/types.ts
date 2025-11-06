@@ -85,3 +85,11 @@ export type AmcDetail = {
     endDate: string;
     description: string;
 };
+
+export type GaushalaProfile = {
+    id: string;
+    name: string;
+    address: string;
+};
+
+    
