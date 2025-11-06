@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -22,17 +23,30 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MoreHorizontal, PlusCircle, Search, FileDown, FileUp } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, writeBatch, doc as firestoreDoc } from 'firebase/firestore';
+import { collection, query, writeBatch, doc as firestoreDoc, addDoc } from 'firebase/firestore';
 import type { Animal } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 function AnimalRowSkeleton() {
   return (
@@ -53,11 +67,26 @@ function AnimalRowSkeleton() {
   );
 }
 
+const initialAnimalState: Omit<Animal, 'id' | 'ownerId'> = {
+    type: 'Cow',
+    govtTagNo: '',
+    breed: '',
+    color: '',
+    gender: 'Female',
+    yearOfBirth: new Date().getFullYear(),
+    healthStatus: 'Healthy',
+    tagColor: '',
+    identificationMark: '',
+};
+
 export default function AnimalsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [newAnimal, setNewAnimal] = useState(initialAnimalState);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
 
   const animalsCollection = useMemoFirebase(() => {
@@ -165,6 +194,31 @@ export default function AnimalsPage() {
     }
   };
 
+  const handleRegisterAnimal = async () => {
+    if (!firestore || !user) {
+        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to register an animal.' });
+        return;
+    }
+     if (!newAnimal.govtTagNo || !newAnimal.breed) {
+        toast({ variant: 'destructive', title: 'Validation Error', description: 'Tag No and Breed are required.' });
+        return;
+    }
+
+    setIsRegistering(true);
+    try {
+        const animalsColRef = collection(firestore, 'animals');
+        await addDoc(animalsColRef, { ...newAnimal, ownerId: user.uid });
+        toast({ title: 'Success', description: 'New animal has been registered.' });
+        setNewAnimal(initialAnimalState);
+        setIsDialogOpen(false);
+    } catch (error) {
+        console.error("Error registering animal:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to register animal.' });
+    } finally {
+        setIsRegistering(false);
+    }
+  };
+
 
   return (
     <Card>
@@ -194,10 +248,104 @@ export default function AnimalsPage() {
                     <FileDown className="mr-2 h-4 w-4" />
                     Export
                 </Button>
-                <Button className="w-auto">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Register Animal
-                </Button>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button className="w-auto">
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Register Animal
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[600px]">
+                        <DialogHeader>
+                            <DialogTitle>Register a New Animal</DialogTitle>
+                            <DialogDescription>
+                                Fill in the details below to add a new animal to the Gaushala records.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                             <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="type">Type</Label>
+                                    <Select value={newAnimal.type} onValueChange={(value) => setNewAnimal({...newAnimal, type: value })}>
+                                        <SelectTrigger id="type">
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Cow">Cow</SelectItem>
+                                            <SelectItem value="Buffalo">Buffalo</SelectItem>
+                                            <SelectItem value="Bull">Bull</SelectItem>
+                                            <SelectItem value="Calf">Calf</SelectItem>
+                                            <SelectItem value="Other">Other</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="govtTagNo">Govt. Tag No.</Label>
+                                    <Input id="govtTagNo" value={newAnimal.govtTagNo} onChange={(e) => setNewAnimal({ ...newAnimal, govtTagNo: e.target.value })} placeholder="UID12345" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="breed">Breed</Label>
+                                    <Input id="breed" value={newAnimal.breed} onChange={(e) => setNewAnimal({ ...newAnimal, breed: e.target.value })} placeholder="e.g., Gir, Murrah" />
+                                </div>
+                                 <div className="space-y-2">
+                                    <Label htmlFor="color">Color</Label>
+                                    <Input id="color" value={newAnimal.color} onChange={(e) => setNewAnimal({ ...newAnimal, color: e.target.value })} placeholder="e.g., Brown, Black" />
+                                </div>
+                            </div>
+                             <div className="grid grid-cols-2 gap-4">
+                                 <div className="space-y-2">
+                                    <Label htmlFor="gender">Gender</Label>
+                                    <Select value={newAnimal.gender} onValueChange={(value: 'Male' | 'Female') => setNewAnimal({ ...newAnimal, gender: value })}>
+                                        <SelectTrigger id="gender">
+                                            <SelectValue placeholder="Select gender" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Female">Female</SelectItem>
+                                            <SelectItem value="Male">Male</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="yearOfBirth">Year of Birth</Label>
+                                    <Input id="yearOfBirth" type="number" value={newAnimal.yearOfBirth} onChange={(e) => setNewAnimal({ ...newAnimal, yearOfBirth: parseInt(e.target.value) })} placeholder="e.g., 2020" />
+                                </div>
+                            </div>
+                             <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="healthStatus">Health Status</Label>
+                                    <Select value={newAnimal.healthStatus} onValueChange={(value: 'Healthy' | 'Sick' | 'Under Treatment') => setNewAnimal({ ...newAnimal, healthStatus: value })}>
+                                        <SelectTrigger id="healthStatus">
+                                            <SelectValue placeholder="Select status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Healthy">Healthy</SelectItem>
+                                            <SelectItem value="Sick">Sick</SelectItem>
+                                            <SelectItem value="Under Treatment">Under Treatment</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="tagColor">Tag Color</Label>
+                                    <Input id="tagColor" value={newAnimal.tagColor} onChange={(e) => setNewAnimal({ ...newAnimal, tagColor: e.target.value })} placeholder="e.g., Yellow, Blue" />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="identificationMark">Identification Mark</Label>
+                                <Input id="identificationMark" value={newAnimal.identificationMark} onChange={(e) => setNewAnimal({ ...newAnimal, identificationMark: e.target.value })} placeholder="Any unique marks" />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button type="button" variant="secondary">Cancel</Button>
+                            </DialogClose>
+                            <Button type="submit" onClick={handleRegisterAnimal} disabled={isRegistering}>
+                                {isRegistering ? 'Registering...' : 'Register Animal'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         </div>
       </CardHeader>
@@ -271,3 +419,4 @@ export default function AnimalsPage() {
     </Card>
   );
 }
+
