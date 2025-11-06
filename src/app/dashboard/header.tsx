@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -13,12 +12,14 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import Link from 'next/link';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { doc } from 'firebase/firestore';
+import type { User as AppUser } from '@/lib/types';
 
 function DateTimeDisplay() {
   const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
@@ -61,7 +62,15 @@ function DateTimeDisplay() {
 export default function Header() {
   const { user } = useUser();
   const auth = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
+
+  const userDocRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+
+  const { data: userData } = useDoc<AppUser>(userDocRef);
 
   const handleLogout = () => {
     if (auth) {
@@ -70,6 +79,10 @@ export default function Header() {
       });
     }
   };
+
+  const displayName = userData?.name || user?.displayName;
+  const photoURL = userData?.photoURL || user?.photoURL;
+  const fallback = displayName ? displayName.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase();
 
   return (
     <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-4 border-b bg-card px-4 md:px-6">
@@ -112,8 +125,8 @@ export default function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">
               <Avatar>
-                <AvatarImage src={user?.photoURL || `https://i.pravatar.cc/150?u=${user?.email}`} alt={user?.displayName || 'User'} />
-                <AvatarFallback>{user?.email?.[0].toUpperCase()}</AvatarFallback>
+                <AvatarImage src={photoURL || `https://i.pravatar.cc/150?u=${user?.email}`} alt={displayName || 'User'} />
+                <AvatarFallback>{fallback}</AvatarFallback>
               </Avatar>
               <span className="sr-only">Toggle user menu</span>
             </Button>
