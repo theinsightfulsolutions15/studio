@@ -38,6 +38,10 @@ export type FinancialRecord = {
   description: string;
   ownerId?: string;
   transactionType?: 'RTGS' | 'NEFT' | 'UPI' | 'Cash' | 'Other';
+  // for milk sales
+  customerName?: string;
+  quantity?: number;
+  rate?: number;
 };
 
 export type MilkRecord = {
