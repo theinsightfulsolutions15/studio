@@ -3,17 +3,17 @@ import type { LucideIcon } from "lucide-react";
 export type Animal = {
   id: string;
   ownerId?: string;
+  type: string;
   govtTagNo: string;
-  tagColor: 'Yellow' | 'Blue' | 'Green' | 'Red';
-  breed: 'Gir' | 'Sahiwal' | 'Red Sindhi' | 'Murrah' | 'Other';
+  breed: string;
   color: string;
+  gender: 'Male' | 'Female';
+  yearOfBirth: number;
   healthStatus: 'Healthy' | 'Sick' | 'Under Treatment';
-  imageUrl: string;
-  imageHint: string;
-  entryDate: string;
-  reasonForEntry: string;
-  exitDate?: string;
-  reasonForExit?: string;
+  tagColor: string;
+  identificationMark?: string;
+  imageUrl?: string;
+  imageHint?: string;
 };
 
 export type User = {

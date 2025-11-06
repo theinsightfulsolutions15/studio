@@ -10,13 +10,13 @@
           "type": "string",
           "description": "Unique identifier for the Animal entity."
         },
-        "governmentTagNumber": {
+        "type": {
+            "type": "string",
+            "description": "The type of animal (e.g., COWS)."
+        },
+        "govtTagNo": {
           "type": "string",
           "description": "The official government tag number assigned to the animal."
-        },
-        "tagColor": {
-          "type": "string",
-          "description": "The color of the animal's tag."
         },
         "breed": {
           "type": "string",
@@ -26,25 +26,47 @@
           "type": "string",
           "description": "The color of the animal's coat."
         },
+        "gender": {
+            "type": "string",
+            "enum": ["Male", "Female"],
+            "description": "The gender of the animal."
+        },
+        "yearOfBirth": {
+            "type": "number",
+            "description": "The birth year of the animal."
+        },
         "healthStatus": {
           "type": "string",
           "description": "The current health status of the animal (e.g., Healthy, Sick)."
         },
-        "animalImage": {
+        "tagColor": {
           "type": "string",
-          "description": "URL or path to the image of the animal.",
-          "format": "uri"
+          "description": "The color of the animal's tag."
+        },
+        "identificationMark": {
+            "type": "string",
+            "description": "Any unique identification mark on the animal."
         },
         "ownerId": {
           "type": "string",
           "description": "The ID of the user who owns this record."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL or path to the image of the animal.",
+          "format": "uri"
         }
       },
       "required": [
         "id",
-        "governmentTagNumber",
+        "type",
+        "govtTagNo",
         "breed",
         "color",
+        "gender",
+        "yearOfBirth",
+        "healthStatus",
+        "tagColor",
         "ownerId"
       ]
     },
