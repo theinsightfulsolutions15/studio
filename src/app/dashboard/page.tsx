@@ -25,20 +25,21 @@ import {
   Activity,
   FileWarning,
 } from 'lucide-react';
-import { monthlyChartData } from '@/lib/placeholder-data';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { collection, serverTimestamp, doc } from 'firebase/firestore';
-import { useState, useEffect } from 'react';
+import { collection, serverTimestamp, doc, query, where, getDocs } from 'firebase/firestore';
+import { useState, useEffect, useMemo } from 'react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import type { User as AppUser } from '@/lib/types';
+import type { User as AppUser, Animal, MilkRecord, FinancialRecord } from '@/lib/types';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { format, getMonth, getYear, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 const chartConfig = {
@@ -168,7 +169,7 @@ function AmcRenewalForm() {
 }
 
 export default function Dashboard() {
-  const { user: authUser, isUserLoading } = useUser();
+  const { user: authUser, isUserLoading: isAuthUserLoading } = useUser();
   const firestore = useFirestore();
   const [isExpired, setIsExpired] = useState(false);
   
@@ -178,6 +179,101 @@ export default function Dashboard() {
   }, [authUser, firestore]);
 
   const { data: user, isLoading: isUserDocLoading } = useDoc<AppUser>(userDocRef);
+  
+  const isAdmin = user?.role === 'Admin';
+  
+  const baseQueryPath = useMemo(() => {
+    if (!firestore || !authUser) return null;
+    return isAdmin ? 'users' : `users/${authUser.uid}`;
+  }, [firestore, authUser, isAdmin]);
+
+
+  // --- Data Queries for Dashboard Cards & Chart ---
+  const animalsQuery = useMemoFirebase(() => {
+    if (!baseQueryPath) return null;
+    const collectionPath = isAdmin ? 'animals' : `${baseQueryPath}/animals`;
+    const q = isAdmin ? collection(firestore, collectionPath) : collection(firestore, collectionPath);
+    return q;
+  }, [baseQueryPath, firestore, isAdmin]);
+  const { data: animals, isLoading: isLoadingAnimals } = useCollection<Animal>(animalsQuery);
+
+  const milkRecordsQuery = useMemoFirebase(() => {
+      if (!baseQueryPath) return null;
+      const collectionPath = isAdmin ? 'milk_records' : `${baseQueryPath}/milk_records`;
+      return collection(firestore, collectionPath);
+  }, [baseQueryPath, firestore, isAdmin]);
+  const { data: milkRecords, isLoading: isLoadingMilk } = useCollection<MilkRecord>(milkRecordsQuery);
+
+  const financialRecordsQuery = useMemoFirebase(() => {
+      if (!baseQueryPath) return null;
+      const collectionPath = isAdmin ? 'financial_records' : `${baseQueryPath}/financial_records`;
+      return collection(firestore, collectionPath);
+  }, [baseQueryPath, firestore, isAdmin]);
+  const { data: financialRecords, isLoading: isLoadingFinancial } = useCollection<FinancialRecord>(financialRecordsQuery);
+
+  // --- Calculate Stats for Cards ---
+  const {
+      totalAnimals,
+      animalsUnderTreatment,
+      milkThisMonth,
+      expensesThisMonth,
+  } = useMemo(() => {
+      const now = new Date();
+      const currentMonth = getMonth(now);
+      const currentYear = getYear(now);
+
+      const totalAnimals = animals?.length || 0;
+      const animalsUnderTreatment = animals?.filter(a => a.healthStatus === 'Sick' || a.healthStatus === 'Under Treatment').length || 0;
+
+      const milkThisMonth = milkRecords?.filter(r => {
+          const recordDate = new Date(r.date);
+          return getMonth(recordDate) === currentMonth && getYear(recordDate) === currentYear;
+      }).reduce((sum, r) => sum + r.quantity, 0) || 0;
+
+      const expensesThisMonth = financialRecords?.filter(r => {
+          const recordDate = new Date(r.date);
+          return (r.recordType === 'Expense' || r.recordType === 'Payment') && getMonth(recordDate) === currentMonth && getYear(recordDate) === currentYear;
+      }).reduce((sum, r) => sum + r.amount, 0) || 0;
+
+      return { totalAnimals, animalsUnderTreatment, milkThisMonth, expensesThisMonth };
+  }, [animals, milkRecords, financialRecords]);
+
+  // --- Process Data for Chart ---
+  const monthlyChartData = useMemo(() => {
+      const data: { [month: string]: { milk: number; expense: number } } = {};
+      const now = new Date();
+
+      for (let i = 5; i >= 0; i--) {
+          const date = subMonths(now, i);
+          const monthKey = format(date, 'MMM yyyy');
+          data[monthKey] = { milk: 0, expense: 0 };
+      }
+
+      milkRecords?.forEach(r => {
+          const recordDate = new Date(r.date);
+          const monthKey = format(recordDate, 'MMM yyyy');
+          if (data[monthKey]) {
+              data[monthKey].milk += r.quantity;
+          }
+      });
+      
+      financialRecords?.forEach(r => {
+          if (r.recordType === 'Expense' || r.recordType === 'Payment') {
+              const recordDate = new Date(r.date);
+              const monthKey = format(recordDate, 'MMM yyyy');
+              if (data[monthKey]) {
+                  data[monthKey].expense += r.amount;
+              }
+          }
+      });
+
+      return Object.entries(data).map(([month, values]) => ({
+          month: month.split(' ')[0], // Just the month name
+          milk: parseFloat(values.milk.toFixed(2)),
+          expense: parseFloat(values.expense.toFixed(2))
+      }));
+  }, [milkRecords, financialRecords]);
+
 
   useEffect(() => {
     if (user) {
@@ -204,7 +300,7 @@ export default function Dashboard() {
     }
   }, [user, isUserDocLoading]);
 
-  const isLoading = isUserLoading || isUserDocLoading;
+  const isLoading = isAuthUserLoading || isUserDocLoading || isLoadingAnimals || isLoadingMilk || isLoadingFinancial;
 
   return (
     <div className="space-y-6">
@@ -218,8 +314,8 @@ export default function Dashboard() {
             <Beef className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">125</div>
-            <p className="text-xs text-muted-foreground">+5 from last month</p>
+            {isLoading ? <Skeleton className="h-8 w-20" /> : <div className="text-2xl font-bold">{totalAnimals}</div>}
+            <p className="text-xs text-muted-foreground">Total registered animals</p>
           </CardContent>
         </Card>
         <Card>
@@ -228,8 +324,8 @@ export default function Dashboard() {
             <Droplets className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">4,890 L</div>
-            <p className="text-xs text-muted-foreground">+12% from last month</p>
+             {isLoading ? <Skeleton className="h-8 w-24" /> : <div className="text-2xl font-bold">{milkThisMonth.toFixed(2)} L</div>}
+            <p className="text-xs text-muted-foreground">For {format(new Date(), 'MMMM')}</p>
           </CardContent>
         </Card>
         <Card>
@@ -238,8 +334,8 @@ export default function Dashboard() {
             <IndianRupee className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹3,800</div>
-            <p className="text-xs text-muted-foreground">-10% from last month</p>
+            {isLoading ? <Skeleton className="h-8 w-28" /> : <div className="text-2xl font-bold">₹{expensesThisMonth.toFixed(2)}</div>}
+            <p className="text-xs text-muted-foreground">For {format(new Date(), 'MMMM')}</p>
           </CardContent>
         </Card>
         <Card>
@@ -248,8 +344,8 @@ export default function Dashboard() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
-            <p className="text-xs text-muted-foreground">2 Sick, 1 Injured</p>
+            {isLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold">{animalsUnderTreatment}</div>}
+            <p className="text-xs text-muted-foreground">Currently sick or injured</p>
           </CardContent>
         </Card>
       </div>
@@ -257,9 +353,14 @@ export default function Dashboard() {
       <Card>
         <CardHeader>
           <CardTitle>Overview</CardTitle>
-          <CardDescription>Monthly Milk Production vs Expenses</CardDescription>
+          <CardDescription>Monthly Milk Production vs Expenses (Last 6 Months)</CardDescription>
         </CardHeader>
         <CardContent className="pl-2">
+          {isLoading ? (
+             <div className="h-[300px] w-full flex items-center justify-center">
+                 <p className="text-muted-foreground">Loading chart data...</p>
+             </div>
+          ) : (
           <ChartContainer config={chartConfig} className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyChartData}>
@@ -282,6 +383,7 @@ export default function Dashboard() {
                 </BarChart>
             </ResponsiveContainer>
           </ChartContainer>
+          )}
         </CardContent>
       </Card>
     </div>

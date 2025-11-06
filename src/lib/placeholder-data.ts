@@ -9,9 +9,9 @@ export const placeholderAnimals: Animal[] = [
     color: 'Brown',
     healthStatus: 'Healthy',
     imageUrl: 'https://picsum.photos/seed/cow1/400/300',
-    imageHint: 'brown cow',
-    entryDate: '2023-01-15',
-    reasonForEntry: 'Rescued',
+    type: 'Cow',
+    gender: 'Female',
+    yearOfBirth: 2018,
   },
   {
     id: '2',
@@ -21,9 +21,9 @@ export const placeholderAnimals: Animal[] = [
     color: 'Black',
     healthStatus: 'Under Treatment',
     imageUrl: 'https://picsum.photos/seed/cow2/400/300',
-    imageHint: 'black buffalo',
-    entryDate: '2023-02-20',
-    reasonForEntry: 'Abandoned',
+    type: 'Buffalo',
+    gender: 'Female',
+    yearOfBirth: 2019,
   },
   {
     id: '3',
@@ -33,9 +33,9 @@ export const placeholderAnimals: Animal[] = [
     color: 'Light Brown',
     healthStatus: 'Healthy',
     imageUrl: 'https://picsum.photos/seed/cow3/400/300',
-    imageHint: 'young calf',
-    entryDate: '2023-03-10',
-    reasonForEntry: 'Born at Gaushala',
+    type: 'Cow',
+    gender: 'Female',
+    yearOfBirth: 2021,
   },
   {
     id: '4',
@@ -45,9 +45,9 @@ export const placeholderAnimals: Animal[] = [
     color: 'Reddish Brown',
     healthStatus: 'Sick',
     imageUrl: 'https://picsum.photos/seed/cow4/400/300',
-    imageHint: 'white cow',
-    entryDate: '2023-04-05',
-    reasonForEntry: 'Owner surrender',
+    type: 'Cow',
+    gender: 'Female',
+    yearOfBirth: 2017,
   },
     {
     id: '5',
@@ -57,9 +57,9 @@ export const placeholderAnimals: Animal[] = [
     color: 'White and Black',
     healthStatus: 'Healthy',
     imageUrl: 'https://picsum.photos/seed/cow5/400/300',
-    imageHint: 'buffalo face',
-    entryDate: '2023-05-12',
-    reasonForEntry: 'Rescued',
+    type: 'Bull',
+    gender: 'Male',
+    yearOfBirth: 2020,
   },
 ];
 
@@ -99,11 +99,11 @@ export const placeholderUsers: User[] = [
 ];
 
 export const financialData: FinancialRecord[] = [
-    { id: '1', date: '2024-05-01', type: 'Receipt', category: 'Donation', amount: 5000, description: 'Donation from Shri Ram.' },
-    { id: '2', date: '2024-05-03', type: 'Expense', category: 'Fodder', amount: 1500, description: 'Purchase of green fodder.' },
-    { id: '3', date: '2024-05-05', type: 'Receipt', category: 'Milk Sale', amount: 750, description: 'Sale of 15L milk.' },
-    { id: '4', date: '2024-05-10', type: 'Expense', category: 'Medical', amount: 1200, description: 'Vaccination for calves.' },
-    { id: '5', date: '2024-05-15', type: 'Payment', category: 'Salary', amount: 8000, description: 'Monthly salary for staff.' },
+    { id: '1', date: '2024-05-01', recordType: 'Receipt', category: 'Donation', amount: 5000, description: 'Donation from Shri Ram.' },
+    { id: '2', date: '2024-05-03', recordType: 'Expense', category: 'Fodder', amount: 1500, description: 'Purchase of green fodder.' },
+    { id: '3', date: '2024-05-05', recordType: 'Receipt', category: 'Milk Sale', amount: 750, description: 'Sale of 15L milk.' },
+    { id: '4', date: '2024-05-10', recordType: 'Expense', category: 'Medical', amount: 1200, description: 'Vaccination for calves.' },
+    { id: '5', date: '2024-05-15', recordType: 'Payment', category: 'Salary', amount: 8000, description: 'Monthly salary for staff.' },
 ];
 
 export const milkData: MilkRecord[] = [
