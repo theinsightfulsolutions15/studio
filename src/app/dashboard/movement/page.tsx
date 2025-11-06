@@ -83,7 +83,7 @@ function MovementsTable({ movements, isLoading, onEdit }: { movements: (AnimalMo
                 <TableCell>{new Date(movement.date).toLocaleDateString()}</TableCell>
                 <TableCell className="font-medium">{movement.animalGovtTagNo || movement.animalId}</TableCell>
                 <TableCell>
-                    <Badge className={movement.type === 'Entry' ? "bg-green-600 text-white" : "bg-red-600 text-white"}>
+                    <Badge className={movement.type === 'Entry' ? "bg-green-600 hover:bg-green-700 text-white" : "bg-red-600 hover:bg-red-700 text-white"}>
                         {movement.type}
                     </Badge>
                 </TableCell>
@@ -155,13 +155,50 @@ export default function MovementPage() {
     }));
   }, [allMovements, animals]);
 
+    const animalStatuses = useMemo(() => {
+        const statuses = new Map<string, 'in' | 'out'>();
+        if (!animals || !allMovements) return statuses;
+
+        const latestMovements = new Map<string, AnimalMovement>();
+        for (const movement of allMovements) {
+            const existing = latestMovements.get(movement.animalId);
+            if (!existing || new Date(movement.date) > new Date(existing.date)) {
+                latestMovements.set(movement.animalId, movement);
+            }
+        }
+        
+        for (const animal of animals) {
+            const latestMovement = latestMovements.get(animal.id);
+            if (latestMovement && latestMovement.type === 'Entry') {
+                 statuses.set(animal.id, 'in');
+            } else {
+                 statuses.set(animal.id, 'out');
+            }
+        }
+
+        return statuses;
+    }, [animals, allMovements]);
+
+    const availableAnimalsForMovement = useMemo(() => {
+        if (!animals) return [];
+        if (dialogMode === 'edit') return animals; 
+
+        if (formData.type === 'Entry') {
+            return animals.filter(a => animalStatuses.get(a.id) === 'out');
+        } else { // 'Exit'
+            return animals.filter(a => animalStatuses.get(a.id) === 'in');
+        }
+    }, [animals, animalStatuses, formData.type, dialogMode]);
+
+
   const [entryMovements, setEntryMovements] = useState<(AnimalMovement & { animalGovtTagNo?: string })[] | null>(null);
   const [exitMovements, setExitMovements] = useState<(AnimalMovement & { animalGovtTagNo?: string })[] | null>(null);
   
   useEffect(() => {
     if (movementsWithAnimalTags) {
-        setEntryMovements(movementsWithAnimalTags.filter(m => m.type === 'Entry'));
-        setExitMovements(movementsWithAnimalTags.filter(m => m.type === 'Exit'));
+        const sortedMovements = [...movementsWithAnimalTags].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setEntryMovements(sortedMovements.filter(m => m.type === 'Entry'));
+        setExitMovements(sortedMovements.filter(m => m.type === 'Exit'));
     } else {
         setEntryMovements(null);
         setExitMovements(null);
@@ -175,10 +212,14 @@ export default function MovementPage() {
         setFormData(movement);
     } else {
         setSelectedMovement(null);
-        setFormData(initialMovementState);
+        setFormData(prev => ({ ...initialMovementState, type: prev.type, date: new Date().toISOString() }));
     }
     setIsDialogOpen(true);
   }
+
+    const handleMovementTypeChange = (value: 'Entry' | 'Exit') => {
+        setFormData({ ...formData, type: value, animalId: '' }); 
+    };
 
   const handleFormSubmit = async () => {
     if (!firestore || !user) {
@@ -262,29 +303,10 @@ export default function MovementPage() {
                 </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-                 <div className="space-y-2">
-                    <Label htmlFor="animalId">Animal (by Tag No)</Label>
-                    <Select 
-                        value={formData.animalId} 
-                        onValueChange={(value) => setFormData({...formData, animalId: value })}
-                        disabled={isLoadingAnimals || dialogMode === 'edit'}
-                    >
-                        <SelectTrigger id="animalId">
-                            <SelectValue placeholder="Select an animal..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {isLoadingAnimals ? <SelectItem value="loading" disabled>Loading animals...</SelectItem> :
-                             animals?.map(animal => (
-                                 <SelectItem key={animal.id} value={animal.id}>{animal.govtTagNo} - {animal.breed}</SelectItem>
-                             ))
-                            }
-                        </SelectContent>
-                    </Select>
-                </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="type">Movement Type</Label>
-                        <Select value={formData.type} onValueChange={(value: 'Entry' | 'Exit') => setFormData({...formData, type: value })}>
+                        <Select value={formData.type} onValueChange={handleMovementTypeChange} disabled={dialogMode === 'edit'}>
                             <SelectTrigger id="type">
                                 <SelectValue placeholder="Select type" />
                             </SelectTrigger>
@@ -299,6 +321,33 @@ export default function MovementPage() {
                         <DatePicker date={new Date(formData.date)} setDate={(d) => setFormData({ ...formData, date: d?.toISOString() || '' })} />
                     </div>
                 </div>
+
+                 <div className="space-y-2">
+                    <Label htmlFor="animalId">Animal (by Tag No)</Label>
+                    <Select 
+                        value={formData.animalId} 
+                        onValueChange={(value) => setFormData({...formData, animalId: value })}
+                        disabled={isLoadingAnimals || dialogMode === 'edit'}
+                    >
+                        <SelectTrigger id="animalId">
+                            <SelectValue placeholder="Select an animal..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {isLoadingAnimals ? (
+                                <SelectItem value="loading" disabled>Loading animals...</SelectItem>
+                            ) : availableAnimalsForMovement.length > 0 ? (
+                                availableAnimalsForMovement.map((animal) => (
+                                   <SelectItem key={animal.id} value={animal.id}>{animal.govtTagNo} - {animal.breed}</SelectItem>
+                                ))
+                             ) : (
+                                <SelectItem value="none" disabled>
+                                    {`No animals available for ${formData.type}.`}
+                                </SelectItem>
+                            )}
+                        </SelectContent>
+                    </Select>
+                </div>
+
                  <div className="space-y-2">
                     <Label htmlFor="reason">Reason</Label>
                     <Input 
