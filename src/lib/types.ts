@@ -42,6 +42,7 @@ export type FinancialRecord = {
   customerName?: string;
   quantity?: number;
   rate?: number;
+  accountId?: string;
 };
 
 export type MilkRecord = {
@@ -96,3 +97,5 @@ export type Account = {
     type: 'Customer' | 'Bank' | 'Expense';
     ownerId?: string;
 };
+
+    
