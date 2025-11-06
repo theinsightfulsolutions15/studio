@@ -28,17 +28,15 @@ export interface InternalQuery extends Query<DocumentData> {
     path: {
       canonicalString(): string
       toString(): string
-    }
+    },
+    // This property exists on collection group queries
+    allDescendants?: boolean;
   }
 }
 
 /**
- * ✅ useCollection Hook
- * React hook to subscribe to a Firestore collection or query in real-time.
- *
- * @template T Type of the document data.
- * @param memoizedTargetRefOrQuery - Firestore CollectionReference or Query (must be memoized with useMemo)
- * @returns Object containing data, isLoading, and error.
+ * ✅ useCollection Hook (Fixed Version)
+ * Works safely with proper Firestore paths and handles permission errors cleanly.
  */
 export function useCollection<T = any>(
   memoizedTargetRefOrQuery:
@@ -54,11 +52,25 @@ export function useCollection<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null)
 
   useEffect(() => {
-    // 🔹 अगर reference/query null है तो कुछ मत करो
+    // ❌ अगर reference/query null या invalid है तो कुछ मत करो
     if (!memoizedTargetRefOrQuery) {
       setData(null)
       setIsLoading(false)
       setError(null)
+      return
+    }
+    
+    const internalQuery = memoizedTargetRefOrQuery as InternalQuery;
+    const isCollectionGroup = internalQuery?._query?.allDescendants === true;
+
+    // ✅ अगर path खाली है, तो error throw करो ताकि Firestore root ना call हो
+    const path =
+      (memoizedTargetRefOrQuery as any).path ||
+      (internalQuery?._query?.path?.canonicalString?.() ?? '')
+
+    if (!isCollectionGroup && (!path || path.trim() === '' || path === '/')) {
+      console.error('❌ Firestore path खाली या invalid है — useCollection() को सही collection दीजिए।')
+      setError(new Error('Invalid Firestore collection path'))
       return
     }
 
@@ -79,22 +91,16 @@ export function useCollection<T = any>(
         setError(null)
       },
       (err: FirestoreError) => {
-        // 🔹 Permission error handle
-        const path: string =
-          (memoizedTargetRefOrQuery as any).type === 'collection'
-            ? (memoizedTargetRefOrQuery as CollectionReference).path
-            : (memoizedTargetRefOrQuery as InternalQuery)._query.path.canonicalString()
-
         const contextualError = new FirestorePermissionError({
           operation: 'list',
-          path,
+          path: isCollectionGroup ? `Collection Group: ${internalQuery._query.path.toString()}` : path,
         })
-
+        console.error('⚠️ Firestore Permission Error:', contextualError)
         setError(contextualError)
         setData(null)
         setIsLoading(false)
 
-        // 🔹 Global error event (optional)
+        // 🔹 Optional global emitter
         errorEmitter.emit('permission-error', contextualError)
       },
     )
@@ -102,13 +108,6 @@ export function useCollection<T = any>(
     // 🔹 Cleanup on unmount
     return () => unsubscribe()
   }, [memoizedTargetRefOrQuery])
-
-  // 🔹 Memoization check (to prevent unnecessary re-renders)
-  if (memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
-    throw new Error(
-      `${memoizedTargetRefOrQuery} was not properly memoized. Use useMemoFirebase() or React.useMemo.`,
-    )
-  }
 
   return { data, isLoading, error }
 }
