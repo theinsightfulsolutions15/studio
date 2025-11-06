@@ -33,7 +33,7 @@ import { Input } from '@/components/ui/input';
 import { PlusCircle, ChevronsUpDown, Check, Trash2, Plus } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, writeBatch, doc } from 'firebase/firestore';
-import type { MilkRecord, Animal } from '@/lib/types';
+import type { MilkRecord, Animal, AnimalMovement } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -88,6 +88,12 @@ export default function MilkRecordsPage() {
   }, [firestore, user]);
   const { data: animals, isLoading: isLoadingAnimals } = useCollection<Animal>(animalsQuery);
 
+  const movementsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, `users/${user.uid}/movements`);
+  }, [firestore, user]);
+  const { data: allMovements, isLoading: isLoadingMovements } = useCollection<AnimalMovement>(movementsQuery);
+
   const milkRecordsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, `users/${user.uid}/milk_records`));
@@ -95,9 +101,35 @@ export default function MilkRecordsPage() {
 
   const { data: milkData, isLoading: isLoadingRecords } = useCollection<MilkRecord>(milkRecordsQuery);
 
+    const animalStatuses = useMemo(() => {
+        const statuses = new Map<string, 'in' | 'out'>();
+        if (!animals || !allMovements) return statuses;
+
+        const sortedMovements = [...allMovements].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        const latestMovements = new Map<string, AnimalMovement>();
+        for (const movement of sortedMovements) {
+            latestMovements.set(movement.animalId, movement);
+        }
+        
+        for (const animal of animals) {
+            const latestMovement = latestMovements.get(animal.id);
+            if (!latestMovement || latestMovement.type === 'Exit') {
+                 statuses.set(animal.id, 'out');
+            } else {
+                 statuses.set(animal.id, 'in');
+            }
+        }
+        return statuses;
+    }, [animals, allMovements]);
+
   const milkingCows = useMemo(() => {
-    return animals?.filter(animal => animal.gender === 'Female' && (animal.type === 'Cow' || animal.type === 'Buffalo')) || [];
-  }, [animals]);
+    return animals?.filter(animal => 
+        animal.gender === 'Female' && 
+        (animal.type === 'Cow' || animal.type === 'Buffalo') &&
+        animalStatuses.get(animal.id) === 'in'
+    ) || [];
+  }, [animals, animalStatuses]);
   
   const groupedData: GroupedMilkData = useMemo(() => {
     if (!milkData) return {};
@@ -197,7 +229,7 @@ export default function MilkRecordsPage() {
     return stagedRecords.reduce((total, record) => total + record.quantity, 0);
   }, [stagedRecords]);
 
-  const isLoading = isLoadingAnimals || isLoadingRecords;
+  const isLoading = isLoadingAnimals || isLoadingRecords || isLoadingMovements;
 
   return (
     <>
