@@ -82,7 +82,7 @@ service cloud.firestore {
       // Only admins can list all users.
       allow list: if isAdmin();
       // Any signed-in user can create their own profile.
-      allow create: if isOwner(userId);
+      allow create: if isSignedIn();
       // Admins can update any profile, users can update their own.
       // Customer ID and Role can only be set by an Admin.
       allow update: if isAdmin() || (isOwner(userId) && !(request.resource.data.customerId != resource.data.customerId) && !(request.resource.data.role != resource.data.role));
