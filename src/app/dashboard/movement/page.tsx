@@ -60,6 +60,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 
 function MovementRowSkeleton() {
@@ -94,7 +95,7 @@ function MovementsTable({ movements, isLoading, onEdit, onDelete, searchTerm }: 
             {isLoading && Array.from({ length: 5 }).map((_, i) => <MovementRowSkeleton key={i} />)}
             {movements?.map((movement) => (
               <TableRow key={movement.id}>
-                <TableCell>{new Date(movement.date).toLocaleDateString()}</TableCell>
+                <TableCell>{format(new Date(movement.date), 'dd/MM/yyyy')}</TableCell>
                 <TableCell className="font-medium">{movement.animalGovtTagNo || movement.animalId}</TableCell>
                 <TableCell>
                     <Badge className={movement.type === 'Entry' ? "bg-green-600 hover:bg-green-700 text-white" : "bg-red-600 hover:bg-red-700 text-white"}>

@@ -167,10 +167,12 @@ export default function LedgerPage() {
       };
     });
 
+    const finalClosingBalance = (transactionsInRange.length > 0 || !dateRange?.from) ? currentBalance : openingBal;
+
     return {
       transactions: transactionsWithBalance,
       openingBalance: openingBal,
-      closingBalance: currentBalance,
+      closingBalance: finalClosingBalance,
     };
   }, [financialRecords, selectedAccountId, dateRange]);
 
@@ -222,7 +224,7 @@ export default function LedgerPage() {
     currentY += 4;
     
     const tableData = transactions.map(tx => [
-      tx.date,
+      format(new Date(tx.date), 'dd/MM/yyyy'),
       tx.description,
       tx.debit > 0 ? tx.debit.toFixed(2) : '-',
       tx.credit > 0 ? tx.credit.toFixed(2) : '-',
@@ -353,7 +355,7 @@ export default function LedgerPage() {
 
               {transactions.map((tx) => (
                 <TableRow key={tx.id}>
-                  <TableCell>{tx.date}</TableCell>
+                  <TableCell>{format(new Date(tx.date), 'dd/MM/yyyy')}</TableCell>
                   <TableCell className="font-medium max-w-[300px] truncate">{tx.description}</TableCell>
                   <TableCell className="text-right text-destructive">{tx.debit > 0 ? tx.debit.toFixed(2) : '-'}</TableCell>
                   <TableCell className="text-right text-green-600">{tx.credit > 0 ? tx.credit.toFixed(2) : '-'}</TableCell>

@@ -48,6 +48,7 @@ import { useState } from 'react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { format } from 'date-fns';
 
 
 // Helper function to generate the next customer ID
@@ -253,7 +254,7 @@ export default function UsersPage() {
                     {user.status}
                   </Badge>
                 </TableCell>
-                <TableCell className="hidden md:table-cell">{user.validityDate || 'N/A'}</TableCell>
+                <TableCell className="hidden md:table-cell">{user.validityDate ? format(new Date(user.validityDate), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

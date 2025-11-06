@@ -23,11 +23,15 @@ export default function LoginPage() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
-  const [isVerifying, setIsVerifying] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(true); // Start as true
 
   useEffect(() => {
+    // If there is no user and we are done loading, stop verifying.
+    if (!user && !isUserLoading) {
+        setIsVerifying(false);
+    }
+    
     if (user && !isUserLoading && firestore && auth) {
-      setIsVerifying(true);
       const userDocRef = doc(firestore, 'users', user.uid);
       getDoc(userDocRef)
         .then((docSnap) => {
@@ -84,12 +88,12 @@ export default function LoginPage() {
     initiateEmailSignIn(auth, email, password);
   };
 
-  if (isUserLoading || isVerifying || user) {
+  if (isVerifying) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
           <p className="text-lg font-semibold">GauRakshak</p>
-          <p className="text-muted-foreground">Verifying your credentials, please wait...</p>
+          <p className="text-muted-foreground">Loading, please wait...</p>
         </div>
       </div>
     );

@@ -577,7 +577,7 @@ export default function MilkRecordsPage() {
                                 <AccordionItem value={date} key={date} className="border rounded-md px-4 bg-muted/20">
                                     <AccordionTrigger className="hover:no-underline py-3">
                                         <div className="flex items-center justify-between w-full">
-                                            <span className="font-semibold text-lg">{new Date(date).toLocaleDateString(undefined, { timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                            <span className="font-semibold text-lg">{format(new Date(date), 'EEEE, dd/MM/yyyy')}</span>
                                             <Badge variant="secondary" className="text-base">Total: {groupedData[date].total.toFixed(2)} L</Badge>
                                         </div>
                                     </AccordionTrigger>
@@ -650,7 +650,7 @@ export default function MilkRecordsPage() {
                                 ))}
                                 {milkSalesData?.map(sale => (
                                     <TableRow key={sale.id}>
-                                        <TableCell>{new Date(sale.date).toLocaleDateString()}</TableCell>
+                                        <TableCell>{format(new Date(sale.date), 'dd/MM/yyyy')}</TableCell>
                                         <TableCell>{sale.invoiceNo}</TableCell>
                                         <TableCell className="font-medium">{sale.customerName}</TableCell>
                                         <TableCell className="text-right">{sale.quantity?.toFixed(2)}</TableCell>
@@ -878,6 +878,3 @@ export default function MilkRecordsPage() {
     </>
   );
 }
-
-    
-    

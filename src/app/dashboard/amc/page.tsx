@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -37,6 +38,7 @@ import { useState } from 'react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { format } from 'date-fns';
 
 function RenewalRowSkeleton() {
   return (
@@ -188,7 +190,7 @@ export default function AmcRenewalsPage() {
             {(isLoadingRenewals) && Array.from({ length: 5 }).map((_, i) => <RenewalRowSkeleton key={i} />)}
             {renewals?.map((renewal) => (
               <TableRow key={renewal.id}>
-                <TableCell>{renewal.date}</TableCell>
+                <TableCell>{format(new Date(renewal.date), 'dd/MM/yyyy')}</TableCell>
                 <TableCell className="font-medium">{renewal.userName}</TableCell>
                 <TableCell>{renewal.customerId}</TableCell>
                 <TableCell>₹{renewal.amount.toFixed(2)}</TableCell>

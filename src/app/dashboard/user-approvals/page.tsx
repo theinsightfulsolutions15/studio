@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -38,6 +39,7 @@ import { useState } from 'react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { format } from 'date-fns';
 
 
 // Helper function to generate the next customer ID
@@ -230,7 +232,7 @@ export default function UserApprovalsPage() {
                         </div>
                     </div>
                 </TableCell>
-                <TableCell className="hidden sm:table-cell">{user.signupDate}</TableCell>
+                <TableCell className="hidden sm:table-cell">{format(new Date(user.signupDate), 'dd/MM/yyyy')}</TableCell>
                 <TableCell>
                   <Badge variant={user.status === 'Pending' ? 'default' : 'destructive'} className="bg-opacity-80">
                     {user.status}

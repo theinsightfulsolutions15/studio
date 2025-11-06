@@ -53,6 +53,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { format } from 'date-fns';
 
 
 function TransactionRowSkeleton() {
@@ -448,7 +449,7 @@ function TransactionsTable({
           ))}
         {data?.map((record) => (
           <TableRow key={record.id}>
-            <TableCell>{record.date}</TableCell>
+            <TableCell>{format(new Date(record.date), 'dd/MM/yyyy')}</TableCell>
             <TableCell>
               <Badge
                 variant={
