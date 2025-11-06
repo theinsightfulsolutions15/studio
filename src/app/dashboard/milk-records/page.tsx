@@ -44,6 +44,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '
 import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
 import { DatePickerWithRange } from '@/components/date-picker-range';
+import { format } from 'date-fns';
 
 
 function MilkRecordRowSkeleton() {
@@ -251,7 +252,6 @@ export default function MilkRecordsPage() {
         setStagedRecords([]);
         setCurrentAnimal(null);
         setCurrentQuantity('');
-        // Keep dialog open for next session/date entry
       } catch (error) {
           console.error("Error adding milk records:", error);
           toast({ variant: 'destructive', title: 'Error', description: 'Failed to add milk records.' });
