@@ -32,7 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PlusCircle, ChevronsUpDown, Check, Trash2, Plus } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, writeBatch } from 'firebase/firestore';
+import { collection, query, writeBatch, doc } from 'firebase/firestore';
 import type { MilkRecord, Animal } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useMemo } from 'react';
@@ -168,12 +168,13 @@ export default function MilkRecordsPage() {
         const recordsColRef = collection(firestore, `users/${user.uid}/milk_records`);
 
         stagedRecords.forEach(record => {
-            const docRef = collection(firestore, `users/${user.uid}/milk_records`).doc();
+            const docRef = doc(recordsColRef);
             batch.set(docRef, {
                 ...record,
                 date: currentDate?.toISOString().split('T')[0],
                 time: currentSession,
                 ownerId: user.uid,
+                animalBreed: undefined, // remove animalBreed from the final object
             });
         });
 
@@ -437,5 +438,3 @@ export default function MilkRecordsPage() {
     </>
   );
 }
-
-    
