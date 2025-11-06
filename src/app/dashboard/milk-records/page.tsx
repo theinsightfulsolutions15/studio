@@ -32,7 +32,7 @@ import { Input } from '@/components/ui/input';
 import { PlusCircle, ChevronsUpDown, Check, Trash2, Plus, Droplets, User } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, writeBatch, doc, where } from 'firebase/firestore';
-import type { MilkRecord, Animal, AnimalMovement, FinancialRecord } from '@/lib/types';
+import type { MilkRecord, Animal, AnimalMovement, FinancialRecord, Account } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useMemo, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -87,6 +87,8 @@ export default function MilkRecordsPage() {
   const [isSalesDialogOpen, setIsSalesDialogOpen] = useState(false);
   const [isSubmittingSale, setIsSubmittingSale] = useState(false);
   const [milkSaleData, setMilkSaleData] = useState(initialMilkSaleState);
+  const [customerComboboxOpen, setCustomerComboboxOpen] = useState(false);
+
 
   // Page-level State
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
@@ -120,6 +122,13 @@ export default function MilkRecordsPage() {
     return query(collection(firestore, `users/${user.uid}/financial_records`), where('category', '==', 'Milk Sale'));
   }, [user, firestore]);
   const { data: milkSalesData, isLoading: isLoadingSales } = useCollection<FinancialRecord>(milkSalesQuery);
+
+  const customerAccountsQuery = useMemoFirebase(() => {
+      if (!firestore || !user) return null;
+      return query(collection(firestore, `users/${user.uid}/accounts`), where('type', '==', 'Customer'));
+  }, [firestore, user]);
+  const { data: customerAccounts, isLoading: isLoadingCustomers } = useCollection<Account>(customerAccountsQuery);
+
 
   // Memoized calculations
   const animalStatuses = useMemo(() => {
@@ -564,7 +573,28 @@ export default function MilkRecordsPage() {
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="customer-name">Customer Name</Label>
-                    <Input id="customer-name" placeholder="Enter customer name" value={milkSaleData.customerName || ''} onChange={(e) => setMilkSaleData(prev => ({ ...prev, customerName: e.target.value }))} />
+                     <Popover open={customerComboboxOpen} onOpenChange={setCustomerComboboxOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" role="combobox" aria-expanded={customerComboboxOpen} className="w-full justify-between" disabled={isLoadingCustomers}>
+                            {milkSaleData.customerName || "Select a customer..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" sideOffset={5}>
+                            <Command>
+                            <CommandInput placeholder="Search customer..." />
+                            <CommandEmpty>{isLoadingCustomers ? "Loading customers..." : "No customers found."}</CommandEmpty>
+                            <CommandGroup>
+                                {customerAccounts?.map((account) => (
+                                <CommandItem key={account.id} value={account.name} onSelect={(currentValue) => { setMilkSaleData(prev => ({ ...prev, customerName: currentValue === milkSaleData.customerName ? "" : currentValue })); setCustomerComboboxOpen(false); }}>
+                                    <Check className={cn("mr-2 h-4 w-4", milkSaleData.customerName === account.name ? "opacity-100" : "opacity-0")} />
+                                    {account.name}
+                                </CommandItem>
+                                ))}
+                            </CommandGroup>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
