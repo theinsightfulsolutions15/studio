@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MoreHorizontal, PlusCircle, Search, FileDown, FileUp } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, writeBatch } from 'firebase/firestore';
+import { collection, query, writeBatch, doc as firestoreDoc } from 'firebase/firestore';
 import type { Animal } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRef } from 'react';
@@ -76,11 +76,19 @@ export default function AnimalsPage() {
         });
         return;
     }
-    const worksheet = XLSX.utils.json_to_sheet(animals.map(animal => {
-        // eslint-disable-next-line no-unused-vars
-        const { id, ownerId, ...rest } = animal;
-        return rest;
+    const dataToExport = animals.map(animal => ({
+        'TYPE': animal.type,
+        'TAG NO': animal.govtTagNo,
+        'BREED': animal.breed,
+        'COLOR': animal.color,
+        'GENDER': animal.gender,
+        'YEAR OF BIRTH': animal.yearOfBirth,
+        'HEALTH STATUS': animal.healthStatus,
+        'TAG COLOR': animal.tagColor,
+        'IDENTIFICATION MARK': animal.identificationMark || '',
     }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Animals");
     XLSX.writeFile(workbook, "Gaushala_Animals.xlsx");
@@ -104,7 +112,7 @@ export default function AnimalsPage() {
                 const workbook = XLSX.read(data, { type: 'binary' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                const json: (Omit<Animal, 'id' | 'ownerId'> & { id?: string })[] = XLSX.utils.sheet_to_json(worksheet);
+                const json: any[] = XLSX.utils.sheet_to_json(worksheet);
 
                 if (json.length === 0) {
                   toast({ variant: 'destructive', title: "Import Failed", description: "The Excel file is empty." });
@@ -114,19 +122,23 @@ export default function AnimalsPage() {
                 const batch = writeBatch(firestore);
                 const animalsColRef = collection(firestore, 'animals');
 
-                json.forEach((animalData) => {
-                    // If an ID exists, update it. Otherwise, create a new doc.
-                    const docRef = animalData.id 
-                        ? collection(firestore, 'animals', animalData.id) 
-                        : collection(firestore, 'animals');
+                json.forEach((row) => {
+                    const newDocRef = firestoreDoc(animalsColRef);
                     
-                    const finalData: Partial<Animal> = {
-                        ...animalData,
+                    const animalData: Omit<Animal, 'id'> = {
+                        type: row['TYPE'],
+                        govtTagNo: String(row['TAG NO']),
+                        breed: row['BREED'],
+                        color: row['COLOR'],
+                        gender: row['GENDER'],
+                        yearOfBirth: Number(row['YEAR OF BIRTH']),
+                        healthStatus: row['HEALTH STATUS'],
+                        tagColor: row['TAG COLOR'],
+                        identificationMark: row['IDENTIFICATION MARK'] || '',
                         ownerId: user.uid,
                     };
-                    delete finalData.id; // Remove ID from data payload
 
-                    batch.set(docRef, finalData, { merge: true });
+                    batch.set(newDocRef, animalData);
                 });
 
                 await batch.commit();
