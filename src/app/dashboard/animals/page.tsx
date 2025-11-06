@@ -41,7 +41,7 @@ import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebas
 import { collection, query, writeBatch, doc as firestoreDoc, addDoc } from 'firebase/firestore';
 import type { Animal } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -87,6 +87,8 @@ export default function AnimalsPage() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [newAnimal, setNewAnimal] = useState(initialAnimalState);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredAnimals, setFilteredAnimals] = useState<Animal[] | null>(null);
 
 
   const animalsCollection = useMemoFirebase(() => {
@@ -95,6 +97,25 @@ export default function AnimalsPage() {
   }, [user, firestore]);
   
   const { data: animals, isLoading } = useCollection<Animal>(animalsCollection);
+
+  useEffect(() => {
+    if (animals) {
+      if (!searchTerm) {
+        setFilteredAnimals(animals);
+      } else {
+        const lowercasedFilter = searchTerm.toLowerCase();
+        const filteredData = animals.filter(animal =>
+          Object.values(animal).some(value =>
+            String(value).toLowerCase().includes(lowercasedFilter)
+          )
+        );
+        setFilteredAnimals(filteredData);
+      }
+    } else {
+      setFilteredAnimals(null);
+    }
+  }, [searchTerm, animals]);
+
 
   const handleExport = () => {
     if (!animals) {
@@ -269,7 +290,12 @@ export default function AnimalsPage() {
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                 <div className="relative flex-1 md:flex-initial">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search animals..." className="pl-8 w-full min-w-[150px] md:w-[250px] lg:w-[300px]" />
+                    <Input 
+                        placeholder="Search animals..." 
+                        className="pl-8 w-full min-w-[150px] md:w-[250px] lg:w-[300px]" 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
                 </div>
                  <Button variant="outline" onClick={handleImportClick}>
                     <FileUp className="mr-2 h-4 w-4" />
@@ -407,7 +433,7 @@ export default function AnimalsPage() {
           </TableHeader>
           <TableBody>
             {(isLoading || !user) && Array.from({ length: 5 }).map((_, i) => <AnimalRowSkeleton key={i} />)}
-            {animals?.map((animal) => (
+            {filteredAnimals?.map((animal) => (
               <TableRow key={animal.id}>
                 <TableCell>{animal.type}</TableCell>
                 <TableCell className="font-medium">{animal.govtTagNo}</TableCell>
@@ -439,10 +465,10 @@ export default function AnimalsPage() {
                 </TableCell>
               </TableRow>
             ))}
-             {animals && animals.length === 0 && !isLoading && (
+             {filteredAnimals && filteredAnimals.length === 0 && !isLoading && (
                 <TableRow>
                     <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
-                        No animals found.
+                        No animals found{searchTerm && ` for "${searchTerm}"`}.
                     </TableCell>
                 </TableRow>
             )}
@@ -451,9 +477,11 @@ export default function AnimalsPage() {
       </CardContent>
        <CardFooter>
         <div className="text-xs text-muted-foreground">
-          Showing <strong>{animals?.length ?? 0}</strong> of <strong>{animals?.length ?? 0}</strong> animals
+          Showing <strong>{filteredAnimals?.length ?? 0}</strong> of <strong>{animals?.length ?? 0}</strong> animals
         </div>
       </CardFooter>
     </Card>
   );
 }
+
+    
