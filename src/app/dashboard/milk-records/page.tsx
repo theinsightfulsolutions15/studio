@@ -201,13 +201,14 @@ export default function MilkRecordsPage() {
 
         stagedRecords.forEach(record => {
             const docRef = doc(recordsColRef);
+            const { animalBreed, ...restOfRecord } = record;
             batch.set(docRef, {
-                ...record,
+                ...restOfRecord,
+                animalBreed: animalBreed,
                 date: currentDate?.toISOString().split('T')[0],
                 time: currentSession,
                 ownerId: user.uid,
-                animalBreed: undefined, // remove animalBreed from the final object
-            });
+              });              
         });
 
         await batch.commit();
@@ -470,3 +471,5 @@ export default function MilkRecordsPage() {
     </>
   );
 }
+
+    
