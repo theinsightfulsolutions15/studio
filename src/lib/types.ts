@@ -60,10 +60,10 @@ export type NavItem = {
 export type AnimalMovement = {
   id: string;
   animalId: string;
-  animalTag: string;
   type: 'Entry' | 'Exit';
-  date: string;
+  date: string; // ISO 8601 format
   reason: string;
+  ownerId?: string;
 };
 
 export type AmcRenewal = {
@@ -84,10 +84,4 @@ export type AmcDetail = {
     startDate: string;
     endDate: string;
     description: string;
-};
-
-export type GaushalaProfile = {
-    id: string;
-    name: string;
-    address: string;
 };

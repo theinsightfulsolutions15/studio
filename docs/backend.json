@@ -91,41 +91,16 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "AnimalMovement",
       "type": "object",
-      "description": "Represents the movement history of an animal in and out of the Gaushala.",
+      "description": "Records an entry or exit event for an animal.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the AnimalMovement entity."
-        },
-        "animalId": {
-          "type": "string",
-          "description": "Reference to Animal. (Relationship: Animal 1:N AnimalMovement)"
-        },
-        "entryDate": {
-          "type": "string",
-          "description": "The date when the animal entered the Gaushala.",
-          "format": "date-time"
-        },
-        "entryReason": {
-          "type": "string",
-          "description": "The reason for the animal's entry into the Gaushala."
-        },
-        "exitDate": {
-          "type": "string",
-          "description": "The date when the animal exited the Gaushala.",
-          "format": "date-time"
-        },
-        "exitReason": {
-          "type": "string",
-          "description": "The reason for the animal's exit from the Gaushala."
-        }
+        "id": { "type": "string", "description": "Unique identifier for the movement record." },
+        "animalId": { "type": "string", "description": "ID of the animal being moved." },
+        "type": { "type": "string", "enum": ["Entry", "Exit"], "description": "The type of movement." },
+        "date": { "type": "string", "format": "date-time", "description": "The date of the movement." },
+        "reason": { "type": "string", "description": "The reason for the movement (e.g., 'Rescued', 'Adopted', 'Deceased')." },
+        "ownerId": { "type": "string", "description": "The ID of the user who recorded this movement." }
       },
-      "required": [
-        "id",
-        "animalId",
-        "entryDate",
-        "entryReason"
-      ]
+      "required": ["id", "animalId", "type", "date", "reason", "ownerId"]
     },
     "FinancialRecord": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -338,21 +313,21 @@
         }
       },
       {
-        "path": "/animals/{animalId}/movements/{animalMovementId}",
+        "path": "/animals/{animalId}/movements/{movementId}",
         "definition": {
           "entityName": "AnimalMovement",
           "schema": {
             "$ref": "#/backend/entities/AnimalMovement"
           },
-          "description": "Stores the movement history of each animal.  Includes denormalized 'ownerId' inherited from the parent Animal document for authorization independence.",
+          "description": "Stores the movement history of each animal. Includes a denormalized 'ownerId' for authorization, indicating which user recorded the movement.",
           "params": [
             {
               "name": "animalId",
               "description": "The unique identifier for the animal."
             },
             {
-              "name": "animalMovementId",
-              "description": "The unique identifier for the animal movement."
+              "name": "movementId",
+              "description": "The unique identifier for the animal movement record."
             }
           ]
         }
@@ -388,21 +363,8 @@
             }
           ]
         }
-      },
-      {
-        "path": "/gaushala_profile/{profileId}",
-        "definition": {
-          "entityName": "GaushalaProfile",
-          "schema": { "$ref": "#/backend/entities/GaushalaProfile" },
-          "description": "Stores the single, central profile for the Gaushala. Admins can write, all users can read.",
-          "params": [
-            { "name": "profileId", "description": "A fixed ID for the Gaushala profile document, e.g., 'main'." }
-          ]
-        }
       }
     ],
     "reasoning": "The Firestore data structure is designed to support the GauRakshak application, focusing on secure and efficient data management for animal records, financial transactions, and user roles. The structure prioritizes authorization independence and facilitates simple, robust security rules. Path-based ownership is utilized for user-specific data, and membership maps are employed for collaborative data access.  The structure also incorporates segregation, with dedicated collections for animals and their movement history and financial records, to enforce homogeneous security postures and simplify security rules. Denormalization of user roles into related data collections ensures authorization independence, eliminating the need for `get()` calls in security rules. This ensures that security rules are atomic and easily debuggable. QAPs are achieved through clear separation of data based on ownership and role-based access control."
   }
 }
-
-    
