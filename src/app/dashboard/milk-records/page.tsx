@@ -59,13 +59,15 @@ type GroupedMilkData = {
     }
 };
 
-const initialMilkSaleState: Partial<FinancialRecord> = {
+const initialMilkSaleState: Partial<FinancialRecord> & { customerId?: string | null } = {
     customerName: '',
+    customerId: null,
     quantity: 0,
     rate: 0,
     amount: 0,
     date: new Date().toISOString(),
 };
+
 
 export default function MilkRecordsPage() {
   const firestore = useFirestore();
@@ -295,14 +297,24 @@ export default function MilkRecordsPage() {
     setIsSubmittingSale(true);
     try {
         const financialColRef = collection(firestore, `users/${user.uid}/financial_records`);
+        
+        // If it's a cash customer, it's a direct receipt.
+        // If it's a named customer, it's a credit sale (Milk Sale type)
+        const recordType = milkSaleData.customerName === 'Cash Customer' ? 'Receipt' : 'Milk Sale';
+
         const dataToSave = {
-            ...milkSaleData,
             date: new Date(milkSaleData.date).toISOString().split('T')[0],
-            recordType: 'Receipt',
+            recordType: recordType,
             category: 'Milk Sale',
             description: `Milk sale to ${milkSaleData.customerName}`,
             ownerId: user.uid,
+            customerName: milkSaleData.customerName,
+            accountId: milkSaleData.customerId,
+            quantity: milkSaleData.quantity,
+            rate: milkSaleData.rate,
+            amount: milkSaleData.amount,
         };
+
         await addDocumentNonBlocking(financialColRef, dataToSave);
         toast({ title: 'Success', description: 'Milk sale recorded successfully.'});
         setIsSalesDialogOpen(false);
@@ -564,7 +576,7 @@ export default function MilkRecordsPage() {
         <DialogContent className="sm:max-w-md">
             <DialogHeader>
                 <DialogTitle>Record Milk Sale</DialogTitle>
-                <DialogDescription>Log a milk sale to a customer. This will be added to your financial records as a receipt.</DialogDescription>
+                <DialogDescription>Log a milk sale to a customer. This will be added to your financial records.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
                  <div className="space-y-2">
@@ -585,12 +597,12 @@ export default function MilkRecordsPage() {
                             <CommandInput placeholder="Search customer..." />
                             <CommandEmpty>{isLoadingCustomers ? "Loading customers..." : "No customers found."}</CommandEmpty>
                             <CommandGroup>
-                                 <CommandItem key="cash-customer" value="Cash Customer" onSelect={(currentValue) => { setMilkSaleData(prev => ({ ...prev, customerName: "Cash Customer" })); setCustomerComboboxOpen(false); }}>
+                                 <CommandItem key="cash-customer" value="Cash Customer" onSelect={() => { setMilkSaleData(prev => ({ ...prev, customerName: "Cash Customer", customerId: null })); setCustomerComboboxOpen(false); }}>
                                     <Check className={cn("mr-2 h-4 w-4", milkSaleData.customerName === "Cash Customer" ? "opacity-100" : "opacity-0")} />
                                     Cash Customer
                                 </CommandItem>
                                 {customerAccounts?.map((account) => (
-                                <CommandItem key={account.id} value={account.name} onSelect={(currentValue) => { setMilkSaleData(prev => ({ ...prev, customerName: currentValue === milkSaleData.customerName ? "" : currentValue })); setCustomerComboboxOpen(false); }}>
+                                <CommandItem key={account.id} value={account.name} onSelect={() => { setMilkSaleData(prev => ({ ...prev, customerName: account.name, customerId: account.id })); setCustomerComboboxOpen(false); }}>
                                     <Check className={cn("mr-2 h-4 w-4", milkSaleData.customerName === account.name ? "opacity-100" : "opacity-0")} />
                                     {account.name}
                                 </CommandItem>
@@ -629,4 +641,5 @@ export default function MilkRecordsPage() {
   );
 }
 
+    
     
