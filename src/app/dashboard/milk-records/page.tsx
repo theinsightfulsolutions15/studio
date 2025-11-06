@@ -31,7 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PlusCircle, ChevronsUpDown, Check, Trash2, Plus, Droplets, User } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, writeBatch, doc } from 'firebase/firestore';
+import { collection, query, writeBatch, doc, where } from 'firebase/firestore';
 import type { MilkRecord, Animal, AnimalMovement, FinancialRecord } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useMemo, useEffect } from 'react';
@@ -117,7 +117,7 @@ export default function MilkRecordsPage() {
   
   const milkSalesQuery = useMemoFirebase(() => {
     if(!user || !firestore) return null;
-    return query(collection(firestore, `users/${user.uid}/financial_records`), where => where('category', '==', 'Milk Sale'));
+    return query(collection(firestore, `users/${user.uid}/financial_records`), where('category', '==', 'Milk Sale'));
   }, [user, firestore]);
   const { data: milkSalesData, isLoading: isLoadingSales } = useCollection<FinancialRecord>(milkSalesQuery);
 
@@ -249,7 +249,10 @@ export default function MilkRecordsPage() {
         stagedRecords.forEach(record => {
             const docRef = doc(recordsColRef);
             batch.set(docRef, {
-                ...record,
+                animalId: record.animalId,
+                animalTag: record.animalTag,
+                quantity: record.quantity,
+                animalBreed: record.animalBreed,
                 date: dateToSave,
                 time: currentSession,
                 ownerId: user.uid,
