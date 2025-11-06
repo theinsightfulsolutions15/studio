@@ -107,8 +107,9 @@ service cloud.firestore {
       match /notifications/{notificationId} {
         // Users can read, update (to mark as read), and delete their own notifications.
         allow read, update, delete: if isOwner(userId);
-        // Admins can list and create notifications.
-        allow list, create: if isAdmin() || isOwner(userId);
+        // A user can list their own notifications. Admins can create them.
+        allow list: if isOwner(userId);
+        allow create: if isAdmin();
       }
     }
 
@@ -119,7 +120,7 @@ service cloud.firestore {
       // Users can create their own renewal requests, even if their account is expired.
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       // Admins can read, list, update, or delete renewal requests.
-      allow get, list, update, delete: if isAdmin();
+      allow read, list, update, delete: if isAdmin();
     }
 
     /**
