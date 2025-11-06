@@ -50,7 +50,7 @@ service cloud.firestore {
     match /users/{userId} {
       // Admins can perform any action on any user.
       // Regular users can only read, update, or delete their own document.
-      allow read, update, delete: if isAdmin() || isOwner(userId);
+      allow get, update, delete: if isAdmin() || isOwner(userId);
       allow list: if isAdmin(); // Only admins can list all users.
       allow create: if isSignedIn(); // Any signed-in user can create their own profile.
 
@@ -58,36 +58,42 @@ service cloud.firestore {
        * Rules for nested animal records.
        */
       match /animals/{animalId} {
-        // Owner can do anything, Admins can do anything.
-        allow read, write: if isOwner(userId) || isAdmin();
+        // Owner or Admin can perform any action on a specific document.
+        allow get, create, update, delete: if isOwner(userId) || isAdmin();
+        // Owner or Admin can list their own/all documents.
+        allow list: if isOwner(userId) || isAdmin();
       }
       
       /**
        * Rules for nested movement records.
        */
       match /movements/{movementId} {
-        allow read, write: if isOwner(userId) || isAdmin();
+        allow get, create, update, delete: if isOwner(userId) || isAdmin();
+        allow list: if isOwner(userId) || isAdmin();
       }
       
       /**
        * Rules for nested financial records.
        */
       match /financial_records/{financialRecordId} {
-        allow read, write: if isOwner(userId) || isAdmin();
+        allow get, create, update, delete: if isOwner(userId) || isAdmin();
+        allow list: if isOwner(userId) || isAdmin();
       }
 
       /**
        * Rules for nested milk records.
        */
       match /milk_records/{milkRecordId} {
-        allow read, write: if isOwner(userId) || isAdmin();
+        allow get, create, update, delete: if isOwner(userId) || isAdmin();
+        allow list: if isOwner(userId) || isAdmin();
       }
        
       /**
        * Rules for nested reports.
        */
        match /reports/{reportId} {
-         allow read, write: if isOwner(userId) || isAdmin();
+         allow get, create, update, delete: if isOwner(userId) || isAdmin();
+         allow list: if isOwner(userId) || isAdmin();
        }
     }
 
@@ -96,9 +102,9 @@ service cloud.firestore {
      */
     match /amc_renewals/{renewalId} {
       // Users can create their own renewal requests.
-      allow create: if isSignedIn() && isOwner(request.resource.data.userId);
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       // Admins can read, list, update, or delete renewal requests.
-      allow list, read, update, delete: if isAdmin();
+      allow list, get, update, delete: if isAdmin();
     }
 
     /**
