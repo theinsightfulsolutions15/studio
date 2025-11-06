@@ -33,10 +33,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/movement', title: 'Movement', icon: Truck },
   { href: '/dashboard/milk-records', title: 'Milk Records', icon: GlassWater },
   { href: '/dashboard/finance', title: 'Finance', icon: IndianRupee },
-  { href: '/dashboard/user-approvals', title: 'User Approvals', icon: UserCheck },
-  { href: '/dashboard/amc', title: 'AMC Renewals', icon: ShieldCheck },
   { href: '/dashboard/reports', title: 'Reports', icon: BarChart2 },
-  { href: '/dashboard/users', title: 'Users', icon: Users },
 ];
 
 const settingsItem: NavItem = {
