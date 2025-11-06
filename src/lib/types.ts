@@ -44,6 +44,7 @@ export type FinancialRecord = {
   quantity?: number;
   rate?: number;
   accountId?: string;
+  invoiceNo?: string;
 };
 
 export type MilkRecord = {

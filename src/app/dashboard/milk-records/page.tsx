@@ -46,9 +46,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PlusCircle, ChevronsUpDown, Check, Trash2, Plus, Droplets, MoreHorizontal } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, query, writeBatch, doc, where } from 'firebase/firestore';
-import type { MilkRecord, Animal, AnimalMovement, FinancialRecord, Account } from '@/lib/types';
+import type { MilkRecord, Animal, AnimalMovement, FinancialRecord, Account, User as AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useMemo, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -63,6 +63,8 @@ import { DatePickerWithRange } from '@/components/date-picker-range';
 import { format } from 'date-fns';
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 
 type StagedRecord = Omit<MilkRecord, 'id' | 'ownerId' | 'date' | 'time'> & { animalBreed: string };
@@ -75,9 +77,10 @@ type GroupedMilkData = {
     }
 };
 
-const initialMilkSaleState: Partial<FinancialRecord> & { customerId?: string | null } = {
+const initialMilkSaleState: Partial<FinancialRecord> & { customerId?: string | null, invoiceNo?: string } = {
     customerName: '',
     customerId: null,
+    invoiceNo: '',
     quantity: 0,
     rate: 0,
     amount: 0,
@@ -126,6 +129,9 @@ export default function MilkRecordsPage() {
   }, [milkSaleData.quantity, milkSaleData.rate]);
 
   // Data queries
+  const userDocRef = useMemoFirebase(() => (user ? doc(firestore, `users/${user.uid}`) : null), [user, firestore]);
+  const { data: userData } = useDoc<AppUser>(userDocRef);
+
   const animalsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return collection(firestore, `users/${user.uid}/animals`);
@@ -146,7 +152,7 @@ export default function MilkRecordsPage() {
   
   const milkSalesQuery = useMemoFirebase(() => {
     if(!user || !firestore) return null;
-    return query(collection(firestore, `users/${user.uid}/financial_records`), where('recordType', 'in', ['Milk Sale', 'Receipt']), where('category', '==', 'Milk Sale'));
+    return query(collection(firestore, `users/${user.uid}/financial_records`), where('category', '==', 'Milk Sale'));
   }, [user, firestore]);
   const { data: milkSalesData, isLoading: isLoadingSales } = useCollection<FinancialRecord>(milkSalesQuery);
 
@@ -309,6 +315,69 @@ export default function MilkRecordsPage() {
       }
   };
 
+  const generateSalePdf = (saleData: typeof milkSaleData) => {
+    if (!userData) {
+        toast({ variant: 'destructive', title: 'PDF Error', description: 'User profile not loaded.' });
+        return;
+    }
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width || doc.internal.pageSize.getWidth();
+    let currentY = 15;
+
+    // Header
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(userData.name || 'Gaushala', pageWidth / 2, currentY, { align: 'center' });
+    currentY += 7;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    if (userData.address) {
+        doc.text(userData.address, pageWidth / 2, currentY, { align: 'center' });
+        currentY += 5;
+    }
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, currentY, pageWidth - 14, currentY);
+    currentY += 10;
+
+    // Invoice Details
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Milk Sale Invoice', 14, currentY);
+    currentY += 7;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Invoice No: ${saleData.invoiceNo}`, 14, currentY);
+    doc.text(`Date: ${format(new Date(saleData.date!), 'dd/MM/yyyy')}`, pageWidth - 14, currentY, { align: 'right' });
+    currentY += 7;
+    doc.text(`Customer: ${saleData.customerName}`, 14, currentY);
+    currentY += 10;
+
+    // Table
+    doc.autoTable({
+        startY: currentY,
+        head: [['Description', 'Quantity (L)', 'Rate (₹)', 'Amount (₹)']],
+        body: [[
+            'Milk Sale',
+            saleData.quantity?.toFixed(2),
+            saleData.rate?.toFixed(2),
+            saleData.amount?.toFixed(2)
+        ]],
+        theme: 'grid',
+        headStyles: { fillColor: [22, 163, 74] },
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 10;
+
+    // Footer
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Amount:', pageWidth - 60, currentY, { align: 'right'});
+    doc.text(`₹${saleData.amount?.toFixed(2)}`, pageWidth - 14, currentY, { align: 'right'});
+    
+    // Download
+    doc.save(`Invoice_${saleData.invoiceNo || 'Sale'}_${saleData.date}.pdf`);
+  };
+
   const handleSaleSubmit = async () => {
     if (!firestore || !user) {
       toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
@@ -332,6 +401,7 @@ export default function MilkRecordsPage() {
             quantity: milkSaleData.quantity,
             rate: milkSaleData.rate,
             amount: milkSaleData.amount,
+            invoiceNo: milkSaleData.invoiceNo,
         };
 
         if(editSaleRecord) {
@@ -342,6 +412,7 @@ export default function MilkRecordsPage() {
             const financialColRef = collection(firestore, `users/${user.uid}/financial_records`);
             await addDocumentNonBlocking(financialColRef, dataToSave);
             toast({ title: 'Success', description: 'Milk sale recorded successfully.'});
+            generateSalePdf(milkSaleData);
         }
         
         setIsSalesDialogOpen(false);
@@ -552,6 +623,7 @@ export default function MilkRecordsPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Date</TableHead>
+                                    <TableHead>Inv. No</TableHead>
                                     <TableHead>Customer</TableHead>
                                     <TableHead className="text-right">Quantity (L)</TableHead>
                                     <TableHead className="text-right">Rate (₹)</TableHead>
@@ -563,6 +635,7 @@ export default function MilkRecordsPage() {
                                 {isLoadingSales && Array.from({length: 5}).map((_, i) => (
                                     <TableRow key={i}>
                                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                                         <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                                         <TableCell className="text-right"><Skeleton className="h-4 w-16" /></TableCell>
                                         <TableCell className="text-right"><Skeleton className="h-4 w-16" /></TableCell>
@@ -573,6 +646,7 @@ export default function MilkRecordsPage() {
                                 {milkSalesData?.map(sale => (
                                     <TableRow key={sale.id}>
                                         <TableCell>{new Date(sale.date).toLocaleDateString()}</TableCell>
+                                        <TableCell>{sale.invoiceNo}</TableCell>
                                         <TableCell className="font-medium">{sale.customerName}</TableCell>
                                         <TableCell className="text-right">{sale.quantity?.toFixed(2)}</TableCell>
                                         <TableCell className="text-right">{sale.rate?.toFixed(2)}</TableCell>
@@ -589,7 +663,7 @@ export default function MilkRecordsPage() {
                                     </TableRow>
                                 ))}
                                 {!isLoadingSales && milkSalesData?.length === 0 && (
-                                    <TableRow><TableCell colSpan={6} className="text-center h-24">No milk sales recorded yet.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={7} className="text-center h-24">No milk sales recorded yet.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
@@ -684,10 +758,17 @@ export default function MilkRecordsPage() {
                 <DialogDescription>Log a milk sale to a customer. This will be added to your financial records.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-                 <div className="space-y-2">
-                    <Label htmlFor="sale-date">Date</Label>
-                    <DatePicker date={milkSaleData.date ? new Date(milkSaleData.date) : undefined} setDate={(d) => setMilkSaleData(prev => ({...prev, date: d?.toISOString()}))}/>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="sale-date">Date</Label>
+                        <DatePicker date={milkSaleData.date ? new Date(milkSaleData.date) : undefined} setDate={(d) => setMilkSaleData(prev => ({...prev, date: d?.toISOString()}))}/>
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="invoice-no">Invoice No.</Label>
+                        <Input id="invoice-no" placeholder="e.g. 001" value={milkSaleData.invoiceNo || ''} onChange={(e) => setMilkSaleData(prev => ({...prev, invoiceNo: e.target.value}))} />
+                    </div>
                 </div>
+
                 <div className="space-y-2">
                     <Label htmlFor="customer-name">Customer Name</Label>
                      <Popover open={customerComboboxOpen} onOpenChange={setCustomerComboboxOpen}>
