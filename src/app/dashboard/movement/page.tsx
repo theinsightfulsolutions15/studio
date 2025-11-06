@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, ChevronsUpDown, Check } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, ChevronsUpDown, Check, Search } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -66,7 +66,7 @@ function MovementRowSkeleton() {
   );
 }
 
-function MovementsTable({ movements, isLoading, onEdit }: { movements: (AnimalMovement & { animalGovtTagNo?: string })[] | null, isLoading: boolean, onEdit: (movement: AnimalMovement) => void }) {
+function MovementsTable({ movements, isLoading, onEdit, searchTerm }: { movements: (AnimalMovement & { animalGovtTagNo?: string })[] | null, isLoading: boolean, onEdit: (movement: AnimalMovement) => void, searchTerm?: string }) {
     return (
         <Table>
           <TableHeader>
@@ -110,7 +110,7 @@ function MovementsTable({ movements, isLoading, onEdit }: { movements: (AnimalMo
              {movements && movements.length === 0 && !isLoading && (
                 <TableRow>
                     <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
-                        No movement records found.
+                        No movement records found{searchTerm && ` for "${searchTerm}"`}.
                     </TableCell>
                 </TableRow>
             )}
@@ -137,6 +137,7 @@ export default function MovementPage() {
   const [formData, setFormData] = useState<Omit<AnimalMovement, 'id' | 'ownerId'>>(initialMovementState);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const animalsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -193,21 +194,18 @@ export default function MovementPage() {
         }
     }, [animals, animalStatuses, formData.type, dialogMode]);
 
+  const filteredMovements = useMemo(() => {
+    if (!movementsWithAnimalTags) return null;
+    if (!searchTerm) return movementsWithAnimalTags;
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return movementsWithAnimalTags.filter(movement =>
+      movement.animalGovtTagNo?.toLowerCase().includes(lowercasedFilter)
+    );
+  }, [searchTerm, movementsWithAnimalTags]);
 
-  const [entryMovements, setEntryMovements] = useState<(AnimalMovement & { animalGovtTagNo?: string })[] | null>(null);
-  const [exitMovements, setExitMovements] = useState<(AnimalMovement & { animalGovtTagNo?: string })[] | null>(null);
+  const entryMovements = useMemo(() => filteredMovements?.filter(m => m.type === 'Entry'), [filteredMovements]);
+  const exitMovements = useMemo(() => filteredMovements?.filter(m => m.type === 'Exit'), [filteredMovements]);
   
-  useEffect(() => {
-    if (movementsWithAnimalTags) {
-        const sortedMovements = [...movementsWithAnimalTags].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setEntryMovements(sortedMovements.filter(m => m.type === 'Entry'));
-        setExitMovements(sortedMovements.filter(m => m.type === 'Exit'));
-    } else {
-        setEntryMovements(null);
-        setExitMovements(null);
-    }
-  }, [movementsWithAnimalTags]);
-
   const openDialog = (mode: 'create' | 'edit', movement: AnimalMovement | null = null) => {
     setDialogMode(mode);
     if (movement) {
@@ -266,10 +264,21 @@ export default function MovementPage() {
                 <CardTitle>Animal Movement</CardTitle>
                 <CardDescription>Track animal entry and exit records.</CardDescription>
             </div>
-            <Button onClick={() => openDialog('create')}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Movement
-            </Button>
+             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <div className="relative flex-1 md:flex-initial">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                        placeholder="Search by Tag No..." 
+                        className="pl-8 w-full min-w-[150px] md:w-[250px] lg:w-[300px]" 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                <Button onClick={() => openDialog('create')}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add Movement
+                </Button>
+            </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -280,19 +289,19 @@ export default function MovementPage() {
             <TabsTrigger value="exits">Exits</TabsTrigger>
           </TabsList>
           <TabsContent value="all" className="mt-4">
-            <MovementsTable movements={movementsWithAnimalTags} isLoading={isLoading} onEdit={(mov) => openDialog('edit', mov)} />
+            <MovementsTable movements={filteredMovements} isLoading={isLoading} onEdit={(mov) => openDialog('edit', mov)} searchTerm={searchTerm} />
           </TabsContent>
           <TabsContent value="entries" className="mt-4">
-             <MovementsTable movements={entryMovements} isLoading={isLoading} onEdit={(mov) => openDialog('edit', mov)} />
+             <MovementsTable movements={entryMovements} isLoading={isLoading} onEdit={(mov) => openDialog('edit', mov)} searchTerm={searchTerm} />
           </TabsContent>
            <TabsContent value="exits" className="mt-4">
-             <MovementsTable movements={exitMovements} isLoading={isLoading} onEdit={(mov) => openDialog('edit', mov)} />
+             <MovementsTable movements={exitMovements} isLoading={isLoading} onEdit={(mov) => openDialog('edit', mov)} searchTerm={searchTerm} />
           </TabsContent>
         </Tabs>
       </CardContent>
        <CardFooter>
         <div className="text-xs text-muted-foreground">
-          Showing <strong>{allMovements?.length ?? 0}</strong> of <strong>{allMovements?.length ?? 0}</strong> records
+          Showing <strong>{filteredMovements?.length ?? 0}</strong> of <strong>{allMovements?.length ?? 0}</strong> records
         </div>
       </CardFooter>
     </Card>
@@ -337,7 +346,7 @@ export default function MovementPage() {
                             disabled={isLoadingAnimals || dialogMode === 'edit'}
                             >
                             {formData.animalId
-                                ? availableAnimalsForMovement.find((animal) => animal.id === formData.animalId)?.govtTagNo
+                                ? animals?.find((animal) => animal.id === formData.animalId)?.govtTagNo
                                 : "Select an animal..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
