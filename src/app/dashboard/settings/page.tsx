@@ -91,10 +91,14 @@ export default function SettingsPage() {
                         <Label htmlFor="user-mobile">Mobile No.</Label>
                         {isLoading ? <Skeleton className="h-10 w-full" /> : <Input id="user-mobile" value={mobileNo} onChange={(e) => setMobileNo(e.target.value)} />}
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="user-role">Role</Label>
-                        {isLoading ? <Skeleton className="h-10 w-full" /> : <Input id="user-role" value={userData?.role || ''} readOnly disabled />}
+                     <div className="space-y-2">
+                        <Label htmlFor="customer-id">Customer ID</Label>
+                        {isLoading ? <Skeleton className="h-10 w-full" /> : <Input id="customer-id" value={userData?.customerId || ''} readOnly disabled />}
                     </div>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="user-role">Role</Label>
+                    {isLoading ? <Skeleton className="h-10 w-full" /> : <Input id="user-role" value={userData?.role || ''} readOnly disabled />}
                 </div>
                  <div className="space-y-2">
                     <Label htmlFor="address">Address</Label>
