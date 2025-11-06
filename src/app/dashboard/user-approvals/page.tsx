@@ -31,7 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, query as firestoreQuery, where, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, doc, query as firestoreQuery, where, getDocs, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -128,14 +128,27 @@ export default function UserApprovalsPage() {
     }
     setIsApproving(selectedUser.id);
     try {
+        const batch = writeBatch(firestore);
+        
         const newCustomerId = getNextCustomerId(allUsers);
         const userDocToUpdateRef = doc(firestore, 'users', selectedUser.id);
-
-        await updateDocumentNonBlocking(userDocToUpdateRef, {
+        batch.update(userDocToUpdateRef, {
             status: 'Active',
             customerId: newCustomerId,
             validityDate: validityDate.toISOString().split('T')[0],
         });
+
+        // Create a notification for the user
+        const notificationRef = doc(collection(firestore, `users/${selectedUser.id}/notifications`));
+        batch.set(notificationRef, {
+            title: "Account Approved!",
+            description: `Welcome to GauRakshak! Your account is now active with Customer ID: ${newCustomerId}.`,
+            createdAt: serverTimestamp(),
+            read: false,
+            icon: 'UserCheck',
+        });
+
+        await batch.commit();
 
         toast({
             title: 'User Approved',

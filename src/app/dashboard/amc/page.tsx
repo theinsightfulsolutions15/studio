@@ -30,7 +30,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, updateDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import type { AmcRenewal, User as AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -96,17 +96,29 @@ export default function AmcRenewalsPage() {
     }
     setIsApproving(true);
     try {
-      const userDocRef = doc(firestore, 'users', selectedRenewal.userId);
-      const renewalDocRef = doc(firestore, 'amc_renewals', selectedRenewal.id);
+      const batch = writeBatch(firestore);
 
-      await updateDocumentNonBlocking(userDocRef, {
+      const userDocRef = doc(firestore, 'users', selectedRenewal.userId);
+      batch.update(userDocRef, {
         validityDate: newValidityDate.toISOString().split('T')[0],
         status: 'Active'
       });
 
-      await updateDocumentNonBlocking(renewalDocRef, {
+      const renewalDocRef = doc(firestore, 'amc_renewals', selectedRenewal.id);
+      batch.update(renewalDocRef, {
         status: 'Approved',
       });
+      
+      const notificationRef = doc(collection(firestore, `users/${selectedRenewal.userId}/notifications`));
+      batch.set(notificationRef, {
+        title: "AMC Renewal Approved",
+        description: `Your subscription has been extended until ${format(newValidityDate, 'dd/MM/yyyy')}.`,
+        createdAt: serverTimestamp(),
+        read: false,
+        icon: 'ShieldCheck',
+      });
+      
+      await batch.commit();
 
       toast({
         title: 'Renewal Approved',

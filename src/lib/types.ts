@@ -99,3 +99,13 @@ export type Account = {
     type: 'Customer' | 'Bank' | 'Expense';
     ownerId?: string;
 };
+
+export type AppNotification = {
+    id: string;
+    title: string;
+    description: string;
+    createdAt: any; // Firestore Timestamp
+    read: boolean;
+    href?: string;
+    icon?: 'UserCheck' | 'ShieldCheck' | 'Activity' | 'Bell';
+};

@@ -283,6 +283,22 @@
         "ownerId": { "type": "string", "description": "The ID of the user who owns this account." }
       },
       "required": ["id", "name", "type", "ownerId"]
+    },
+     "AppNotification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AppNotification",
+      "type": "object",
+      "description": "Represents a notification for a user.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the notification." },
+        "title": { "type": "string", "description": "The title of the notification." },
+        "description": { "type": "string", "description": "A detailed description of the notification." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when the notification was created." },
+        "read": { "type": "boolean", "description": "Whether the user has read the notification." },
+        "href": { "type": "string", "description": "An optional link for the notification." },
+        "icon": { "type": "string", "enum": ["UserCheck", "ShieldCheck", "Activity", "Bell"], "description": "An optional icon for the notification."}
+      },
+      "required": ["id", "title", "description", "createdAt", "read"]
     }
   },
   "auth": {
@@ -384,6 +400,18 @@
             "params": [
                 { "name": "userId", "description": "The unique ID of the user." },
                 { "name": "accountId", "description": "The unique ID for the account." }
+            ]
+        }
+      },
+      {
+        "path": "/users/{userId}/notifications/{notificationId}",
+        "definition": {
+            "entityName": "AppNotification",
+            "schema": { "$ref": "#/backend/entities/AppNotification" },
+            "description": "Stores user-specific notifications.",
+            "params": [
+                { "name": "userId", "description": "The unique ID of the user." },
+                { "name": "notificationId", "description": "The unique ID for the notification." }
             ]
         }
       },

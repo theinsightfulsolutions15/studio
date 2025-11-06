@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -7,6 +8,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -16,10 +20,10 @@ import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, useCollection 
 import { signOut } from 'firebase/auth';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, UserCheck, ShieldCheck, Activity } from 'lucide-react';
+import { Bell, UserCheck, ShieldCheck, Activity, CheckCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { doc, collection, query, where } from 'firebase/firestore';
-import type { User as AppUser, AmcRenewal, Animal } from '@/lib/types';
+import { doc, collection, query, where, writeBatch, orderBy } from 'firebase/firestore';
+import type { User as AppUser, AmcRenewal, Animal, AppNotification } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 
 function DateTimeDisplay() {
@@ -72,9 +76,9 @@ export default function Header() {
   }, [user, firestore]);
 
   const { data: userData } = useDoc<AppUser>(userDocRef);
-
   const isAdmin = userData?.role === 'Admin';
 
+  // --- Admin Specific Notifications ---
   const pendingUsersQuery = useMemoFirebase(() => (
     isAdmin && firestore ? query(collection(firestore, 'users'), where('status', '==', 'Pending')) : null
   ), [isAdmin, firestore]);
@@ -85,12 +89,21 @@ export default function Header() {
   ), [isAdmin, firestore]);
   const { data: pendingRenewals } = useCollection<AmcRenewal>(pendingRenewalsQuery);
 
+  // --- User Specific Notifications ---
   const sickAnimalsQuery = useMemoFirebase(() => (
       user && firestore ? query(collection(firestore, `users/${user.uid}/animals`), where('healthStatus', 'in', ['Sick', 'Under Treatment'])) : null
   ), [user, firestore]);
   const { data: sickAnimals } = useCollection<Animal>(sickAnimalsQuery);
+  
+  const userNotificationsQuery = useMemoFirebase(() => (
+    user && firestore ? query(collection(firestore, `users/${user.uid}/notifications`), where('read', '==', false), orderBy('createdAt', 'desc')) : null
+  ), [user, firestore]);
+  const { data: userNotifications } = useCollection<AppNotification>(userNotificationsQuery);
 
-  const notificationsCount = (pendingUsers?.length ?? 0) + (pendingRenewals?.length ?? 0) + (sickAnimals?.length ?? 0);
+  const adminNotificationsCount = (pendingUsers?.length ?? 0) + (pendingRenewals?.length ?? 0);
+  const userSpecificNotificationsCount = (sickAnimals?.length ?? 0) + (userNotifications?.length ?? 0);
+
+  const totalNotificationsCount = isAdmin ? adminNotificationsCount + userSpecificNotificationsCount : userSpecificNotificationsCount;
 
   const handleLogout = () => {
     if (auth) {
@@ -100,9 +113,28 @@ export default function Header() {
     }
   };
 
+  const markAllAsRead = async () => {
+    if (!firestore || !user || !userNotifications || userNotifications.length === 0) return;
+    const batch = writeBatch(firestore);
+    userNotifications.forEach(notif => {
+        const notifRef = doc(firestore, `users/${user.uid}/notifications`, notif.id);
+        batch.update(notifRef, { read: true });
+    });
+    await batch.commit();
+  };
+
   const displayName = userData?.name || user?.displayName;
   const photoURL = userData?.photoURL || user?.photoURL;
   const fallback = displayName ? displayName.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase();
+
+  const getIcon = (iconName: AppNotification['icon']) => {
+    switch (iconName) {
+        case 'UserCheck': return <UserCheck className="h-4 w-4 text-blue-500" />;
+        case 'ShieldCheck': return <ShieldCheck className="h-4 w-4 text-green-500" />;
+        case 'Activity': return <Activity className="h-4 w-4 text-red-500" />;
+        default: return <Bell className="h-4 w-4 text-gray-500" />;
+    }
+  };
 
   return (
     <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-4 border-b bg-card px-4 md:px-6">
@@ -117,40 +149,34 @@ export default function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative rounded-full">
               <Bell className="h-5 w-5" />
-              {notificationsCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-4 w-4 justify-center rounded-full p-0 text-xs">{notificationsCount}</Badge>
+              {totalNotificationsCount > 0 && (
+                <Badge className="absolute -top-1 -right-1 h-4 w-4 justify-center rounded-full p-0 text-xs">{totalNotificationsCount}</Badge>
               )}
               <span className="sr-only">Toggle notifications</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[350px]">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+            <DropdownMenuLabel className="flex justify-between items-center">
+              <span>Notifications</span>
+               {(userNotifications && userNotifications.length > 0) && (
+                <Button variant="link" size="sm" className="h-auto p-0" onClick={markAllAsRead}>Mark all as read</Button>
+              )}
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {notificationsCount === 0 ? (
+            {totalNotificationsCount === 0 ? (
                 <div className="px-2 py-6 text-center text-sm text-muted-foreground">
                     You have no new notifications.
                 </div>
             ) : (
                 <>
-                {pendingUsers?.map(u => (
-                    <DropdownMenuItem key={u.id} asChild>
-                        <Link href="/dashboard/user-approvals" className="flex flex-col items-start gap-1">
+                {userNotifications?.map(n => (
+                     <DropdownMenuItem key={n.id} asChild>
+                        <Link href={n.href || '#'} className="flex flex-col items-start gap-1">
                             <div className="flex items-center gap-2">
-                                <UserCheck className="h-4 w-4 text-blue-500" />
-                                <p className="font-medium">New User Pending Approval</p>
+                                {getIcon(n.icon)}
+                                <p className="font-medium">{n.title}</p>
                             </div>
-                            <p className="pl-6 text-xs text-muted-foreground">{u.name} is waiting for approval.</p>
-                        </Link>
-                    </DropdownMenuItem>
-                ))}
-                {pendingRenewals?.map(r => (
-                     <DropdownMenuItem key={r.id} asChild>
-                        <Link href="/dashboard/amc" className="flex flex-col items-start gap-1">
-                           <div className="flex items-center gap-2">
-                                <ShieldCheck className="h-4 w-4 text-green-500" />
-                                <p className="font-medium">New AMC Renewal Request</p>
-                            </div>
-                            <p className="pl-6 text-xs text-muted-foreground">{r.userName} submitted a renewal request.</p>
+                            <p className="pl-6 text-xs text-muted-foreground">{n.description}</p>
                         </Link>
                     </DropdownMenuItem>
                 ))}
@@ -165,6 +191,38 @@ export default function Header() {
                         </Link>
                     </DropdownMenuItem>
                 ))}
+                 {isAdmin && (adminNotificationsCount > 0) && (
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                            <UserCheck className="h-4 w-4 text-blue-500 mr-2" />
+                            Admin Actions ({adminNotificationsCount})
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="p-0">
+                             {pendingUsers?.map(u => (
+                                <DropdownMenuItem key={u.id} asChild>
+                                    <Link href="/dashboard/user-approvals" className="flex flex-col items-start gap-1">
+                                        <div className="flex items-center gap-2">
+                                            <UserCheck className="h-4 w-4 text-blue-500" />
+                                            <p className="font-medium">New User Pending Approval</p>
+                                        </div>
+                                        <p className="pl-6 text-xs text-muted-foreground">{u.name} is waiting for approval.</p>
+                                    </Link>
+                                </DropdownMenuItem>
+                            ))}
+                            {pendingRenewals?.map(r => (
+                                <DropdownMenuItem key={r.id} asChild>
+                                    <Link href="/dashboard/amc" className="flex flex-col items-start gap-1">
+                                    <div className="flex items-center gap-2">
+                                            <ShieldCheck className="h-4 w-4 text-green-500" />
+                                            <p className="font-medium">New AMC Renewal Request</p>
+                                        </div>
+                                        <p className="pl-6 text-xs text-muted-foreground">{r.userName} submitted a renewal request.</p>
+                                    </Link>
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                )}
                 </>
             )}
           </DropdownMenuContent>
