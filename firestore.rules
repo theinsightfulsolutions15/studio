@@ -50,7 +50,9 @@ service cloud.firestore {
     match /users/{userId} {
       // Admins can perform any action on any user.
       // Regular users can only read, update, or delete their own document.
-      allow get, update, delete: if isAdmin() || isOwner(userId);
+      // A user should be able to read their own doc even if expired to check status.
+      allow get: if isOwner(userId) || isAdmin();
+      allow update, delete: if (isAdmin() || isOwner(userId)) && isAccountActive();
       allow list: if isAdmin(); // Only admins can list all users.
       allow create: if isSignedIn(); // Any signed-in user can create their own profile.
 
@@ -59,49 +61,49 @@ service cloud.firestore {
        */
       match /animals/{animalId} {
         // Owner or Admin can perform any action on a specific document.
-        allow get, create, update, delete: if isOwner(userId) || isAdmin();
+        allow get, create, update, delete: if (isOwner(userId) || isAdmin()) && isAccountActive();
         // Owner or Admin can list their own/all documents.
-        allow list: if isOwner(userId) || isAdmin();
+        allow list: if (isOwner(userId) || isAdmin()) && isAccountActive();
       }
       
       /**
        * Rules for nested movement records.
        */
       match /movements/{movementId} {
-        allow get, create, update, delete: if isOwner(userId) || isAdmin();
-        allow list: if isOwner(userId) || isAdmin();
+        allow get, create, update, delete: if (isOwner(userId) || isAdmin()) && isAccountActive();
+        allow list: if (isOwner(userId) || isAdmin()) && isAccountActive();
       }
       
       /**
        * Rules for nested financial records.
        */
       match /financial_records/{financialRecordId} {
-        allow get, create, update, delete: if isOwner(userId) || isAdmin();
-        allow list: if isOwner(userId) || isAdmin();
+        allow get, create, update, delete: if (isOwner(userId) || isAdmin()) && isAccountActive();
+        allow list: if (isOwner(userId) || isAdmin()) && isAccountActive();
       }
 
       /**
        * Rules for nested milk records.
        */
       match /milk_records/{milkRecordId} {
-        allow get, create, update, delete: if isOwner(userId) || isAdmin();
-        allow list: if isOwner(userId) || isAdmin();
+        allow get, create, update, delete: if (isOwner(userId) || isAdmin()) && isAccountActive();
+        allow list: if (isOwner(userId) || isAdmin()) && isAccountActive();
       }
        
       /**
        * Rules for nested reports.
        */
        match /reports/{reportId} {
-         allow get, create, update, delete: if isOwner(userId) || isAdmin();
-         allow list: if isOwner(userId) || isAdmin();
+         allow get, create, update, delete: if (isOwner(userId) || isAdmin()) && isAccountActive();
+         allow list: if (isOwner(userId) || isAdmin()) && isAccountActive();
        }
 
       /**
        * Rules for nested account records.
        */
       match /accounts/{accountId} {
-        allow get, create, update, delete: if isOwner(userId) || isAdmin();
-        allow list: if isOwner(userId) || isAdmin();
+        allow get, create, update, delete: if (isOwner(userId) || isAdmin()) && isAccountActive();
+        allow list: if (isOwner(userId) || isAdmin()) && isAccountActive();
       }
     }
 
@@ -109,7 +111,7 @@ service cloud.firestore {
      * Rules for AMC renewal requests (top-level collection).
      */
     match /amc_renewals/{renewalId} {
-      // Users can create their own renewal requests.
+      // Users can create their own renewal requests, even if their account is expired.
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       // Admins can read, list, update, or delete renewal requests.
       allow list, get, update, delete: if isAdmin();
