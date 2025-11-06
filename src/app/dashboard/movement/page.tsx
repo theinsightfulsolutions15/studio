@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -37,7 +38,7 @@ import { MoreHorizontal, PlusCircle } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, collectionGroup, query, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import type { Animal, AnimalMovement } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
@@ -323,3 +324,5 @@ export default function MovementPage() {
     </>
   );
 }
+
+    
