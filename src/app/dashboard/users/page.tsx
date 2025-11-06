@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -84,7 +85,6 @@ function UserRowSkeleton() {
        <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-16" /></TableCell>
       <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
       <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
-      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
       <TableCell>
         <Skeleton className="h-8 w-8 rounded-md" />
       </TableCell>
@@ -179,7 +179,6 @@ export default function UsersPage() {
                             <TableHead className="hidden sm:table-cell">Customer ID</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="hidden md:table-cell">Validity Date</TableHead>
-                            <TableHead className="hidden lg:table-cell">Signup Date</TableHead>
                             <TableHead><span className="sr-only">Actions</span></TableHead>
                         </TableRow>
                     </TableHeader>
@@ -227,7 +226,6 @@ export default function UsersPage() {
               <TableHead className="hidden sm:table-cell">Customer ID</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="hidden md:table-cell">Validity Date</TableHead>
-              <TableHead className="hidden lg:table-cell">Signup Date</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -256,7 +254,6 @@ export default function UsersPage() {
                   </Badge>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">{user.validityDate || 'N/A'}</TableCell>
-                <TableCell className="hidden lg:table-cell">{user.signupDate}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
