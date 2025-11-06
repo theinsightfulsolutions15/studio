@@ -493,7 +493,7 @@ export default function MilkRecordsPage() {
                 <div className="grid grid-cols-2 gap-4 border-b pb-4">
                      <div className="space-y-2">
                         <Label htmlFor="date">Date</Label>
-                        <DatePicker date={currentDate} setDate={(d) => d && setCurrentDate(new Date(d.getTime() - d.getTimezoneOffset() * -60000))}/>
+                        <DatePicker date={currentDate} setDate={(d) => d && setCurrentDate(new Date(d.getTime() - (d.getTimezoneOffset() * 60000)))}/>
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="time">Milking Time</Label>
@@ -585,6 +585,10 @@ export default function MilkRecordsPage() {
                             <CommandInput placeholder="Search customer..." />
                             <CommandEmpty>{isLoadingCustomers ? "Loading customers..." : "No customers found."}</CommandEmpty>
                             <CommandGroup>
+                                 <CommandItem key="cash-customer" value="Cash Customer" onSelect={(currentValue) => { setMilkSaleData(prev => ({ ...prev, customerName: "Cash Customer" })); setCustomerComboboxOpen(false); }}>
+                                    <Check className={cn("mr-2 h-4 w-4", milkSaleData.customerName === "Cash Customer" ? "opacity-100" : "opacity-0")} />
+                                    Cash Customer
+                                </CommandItem>
                                 {customerAccounts?.map((account) => (
                                 <CommandItem key={account.id} value={account.name} onSelect={(currentValue) => { setMilkSaleData(prev => ({ ...prev, customerName: currentValue === milkSaleData.customerName ? "" : currentValue })); setCustomerComboboxOpen(false); }}>
                                     <Check className={cn("mr-2 h-4 w-4", milkSaleData.customerName === account.name ? "opacity-100" : "opacity-0")} />
@@ -624,3 +628,5 @@ export default function MilkRecordsPage() {
     </>
   );
 }
+
+    
