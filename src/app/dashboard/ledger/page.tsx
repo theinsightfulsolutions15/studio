@@ -16,6 +16,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { ChevronsUpDown, Check } from 'lucide-react';
@@ -69,7 +70,7 @@ export default function LedgerPage() {
   
   const allAccountOptions = useMemo(() => {
     const options = accounts ? [...accounts] : [];
-    options.unshift({ id: 'cash-customer', name: 'Cash Customer', type: 'Customer' });
+    options.unshift({ id: 'cash-customer', name: 'Cash Customer', type: 'Customer' } as Account);
     return options;
   }, [accounts]);
 
@@ -216,4 +217,5 @@ export default function LedgerPage() {
     </>
   );
 }
+
 
