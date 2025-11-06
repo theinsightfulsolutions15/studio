@@ -30,15 +30,18 @@ import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 
 const baseNavItems: NavItem[] = [
   { href: '/dashboard', title: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/animals', title: 'Animals', icon: Beef },
   { href: '/dashboard/movement', title: 'Movement', icon: Truck },
   { href: '/dashboard/milk-records', title: 'Milk Records', icon: GlassWater },
   { href: '/dashboard/finance', title: 'Finance', icon: IndianRupee },
   { href: '/dashboard/reports', title: 'Reports', icon: BarChart2 },
 ];
 
+const masterNavItems: NavItem[] = [
+    { href: '/dashboard/master/animals', title: 'Animals', icon: Beef },
+    { href: '/dashboard/master/accounts', title: 'Accounts', icon: BookUser },
+];
+
 const adminNavItems: NavItem[] = [
-    { href: '/dashboard/master/accounts', title: 'Masters', icon: BookUser },
     { href: '/dashboard/users', title: 'Users', icon: Users },
     { href: '/dashboard/user-approvals', title: 'User Approvals', icon: UserCheck },
     { href: '/dashboard/amc', title: 'AMC Renewals', icon: ShieldCheck },
@@ -64,7 +67,7 @@ export default function Nav() {
 
   const isAdmin = currentUser?.role === 'Admin';
 
-  const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems;
+  const navItems = isAdmin ? [...baseNavItems, ...masterNavItems, ...adminNavItems] : [...baseNavItems, { href: '/dashboard/master/animals', title: 'Animals', icon: Beef }];
 
 
   return (
