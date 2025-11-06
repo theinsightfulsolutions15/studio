@@ -198,6 +198,8 @@ export default function MilkRecordsPage() {
       try {
         const batch = writeBatch(firestore);
         const recordsColRef = collection(firestore, `users/${user.uid}/milk_records`);
+        
+        const dateToSave = currentDate ? new Date(currentDate.getTime() - (currentDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
         stagedRecords.forEach(record => {
             const docRef = doc(recordsColRef);
@@ -205,7 +207,7 @@ export default function MilkRecordsPage() {
             batch.set(docRef, {
                 ...restOfRecord,
                 animalBreed: animalBreed,
-                date: currentDate?.toISOString().split('T')[0],
+                date: dateToSave,
                 time: currentSession,
                 ownerId: user.uid,
               });              
@@ -261,7 +263,7 @@ export default function MilkRecordsPage() {
                 <AccordionItem value={date} key={date} className="border rounded-md px-4 bg-muted/20">
                     <AccordionTrigger className="hover:no-underline py-3">
                         <div className="flex items-center justify-between w-full">
-                            <span className="font-semibold text-lg">{new Date(date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                            <span className="font-semibold text-lg">{new Date(date).toLocaleDateString(undefined, { timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
                             <Badge variant="secondary" className="text-base">Total: {groupedData[date].total.toFixed(2)} L</Badge>
                         </div>
                     </AccordionTrigger>
