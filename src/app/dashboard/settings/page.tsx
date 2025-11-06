@@ -29,7 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import type { User as AppUser, GaushalaProfile } from '@/lib/types';
+import type { User as AppUser } from '@/lib/types';
 
 export default function SettingsPage() {
   const { user, isUserLoading } = useUser();
@@ -41,25 +41,14 @@ export default function SettingsPage() {
     return doc(firestore, `users/${user.uid}`);
   }, [user, firestore]);
   
-  const gaushalaProfileDocRef = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return doc(firestore, 'gaushala_profile', 'main');
-  }, [firestore]);
-
 
   const { data: userData, isLoading: isUserDocLoading } = useDoc<AppUser>(userDocRef);
-  const { data: gaushalaProfileData, isLoading: isGaushalaProfileLoading } = useDoc<GaushalaProfile>(gaushalaProfileDocRef);
-
+  
   // User Profile state
   const [displayName, setDisplayName] = useState('');
   const [address, setAddress] = useState('');
   const [mobileNo, setMobileNo] = useState('');
   const [photoURL, setPhotoURL] = useState<string | null>(null);
-
-  // Gaushala Profile state
-  const [gaushalaName, setGaushalaName] = useState('');
-  const [gaushalaAddress, setGaushalaAddress] = useState('');
-
 
   // Image Capture State
   const [isCaptureDialogOpen, setIsCaptureDialogOpen] = useState(false);
@@ -79,13 +68,6 @@ export default function SettingsPage() {
     }
   }, [userData, user]);
   
-   useEffect(() => {
-    if (gaushalaProfileData) {
-      setGaushalaName(gaushalaProfileData.name || '');
-      setGaushalaAddress(gaushalaProfileData.address || '');
-    }
-  }, [gaushalaProfileData]);
-
 
   useEffect(() => {
     if (isCaptureDialogOpen) {
@@ -165,19 +147,7 @@ export default function SettingsPage() {
     });
   };
   
-  const handleGaushalaProfileSave = () => {
-    if (!gaushalaProfileDocRef) return;
-    setDocumentNonBlocking(gaushalaProfileDocRef, {
-        name: gaushalaName,
-        address: gaushalaAddress
-    }, { merge: true });
-     toast({
-      title: "Success",
-      description: "Gaushala profile updated successfully.",
-    });
-  }
-
-  const isLoading = isUserLoading || isUserDocLoading || isGaushalaProfileLoading;
+  const isLoading = isUserLoading || isUserDocLoading;
 
   return (
     <>
@@ -269,24 +239,6 @@ export default function SettingsPage() {
                 </div>
             </CardContent>
         </Card>
-
-         <Card>
-            <CardHeader>
-                <CardTitle>Gaushala Profile</CardTitle>
-                <CardDescription>Update the name and address of the Gaushala.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                 <div className="space-y-2">
-                    <Label htmlFor="gaushala-name">Gaushala Name</Label>
-                    {isLoading ? <Skeleton className="h-10 w-full" /> : <Input id="gaushala-name" value={gaushalaName} onChange={(e) => setGaushalaName(e.target.value)} />}
-                </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="g-address">Address</Label>
-                    {isLoading ? <Skeleton className="h-20 w-full" /> : <Textarea id="g-address" value={gaushalaAddress} onChange={(e) => setGaushalaAddress(e.target.value)} />}
-                </div>
-                <Button onClick={handleGaushalaProfileSave} disabled={isLoading}>Save Changes</Button>
-            </CardContent>
-        </Card>
     </div>
 
      <Dialog open={isCaptureDialogOpen} onOpenChange={setIsCaptureDialogOpen}>
@@ -323,7 +275,3 @@ export default function SettingsPage() {
     </>
   );
 }
-
-    
-
-    

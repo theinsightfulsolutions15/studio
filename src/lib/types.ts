@@ -91,5 +91,3 @@ export type GaushalaProfile = {
     name: string;
     address: string;
 };
-
-    
