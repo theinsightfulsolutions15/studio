@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "GaushalaProfile": {
@@ -142,6 +143,36 @@
         "ownerId"
       ]
     },
+    "MilkRecord": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MilkRecord",
+      "type": "object",
+      "description": "Represents a milk production record for an animal.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the milk record." },
+        "animalId": { "type": "string", "description": "ID of the animal that produced the milk." },
+        "animalTag": { "type": "string", "description": "Government tag number of the animal." },
+        "date": { "type": "string", "format": "date", "description": "Date of the milking." },
+        "quantity": { "type": "number", "description": "Quantity of milk produced in liters." },
+        "time": { "type": "string", "enum": ["Morning", "Evening"], "description": "Milking session." },
+        "ownerId": { "type": "string", "description": "The ID of the user who recorded this." }
+      },
+      "required": ["id", "animalId", "animalTag", "date", "quantity", "time", "ownerId"]
+    },
+     "Report": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Report",
+      "type": "object",
+      "description": "Represents a generated report.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the report." },
+        "generatedAt": { "type": "string", "format": "date-time", "description": "Timestamp of report generation." },
+        "type": { "type": "string", "description": "Type of the report (e.g., 'Financial', 'Animal Health')." },
+        "data": { "type": "object", "description": "The JSON data of the report." },
+        "ownerId": { "type": "string", "description": "The ID of the user who generated this report." }
+      },
+      "required": ["id", "generatedAt", "type", "data", "ownerId"]
+    },
     "User": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
@@ -266,22 +297,68 @@
         }
       },
       {
-        "path": "/users/{userId}/amc_details/{amcDetailId}",
+        "path": "/users/{userId}/animals/{animalId}",
         "definition": {
-          "entityName": "AmcDetail",
+          "entityName": "Animal",
           "schema": {
-            "$ref": "#/backend/entities/AmcDetail"
+            "$ref": "#/backend/entities/Animal"
           },
-          "description": "Stores AMC details for each user. Uses path-based ownership to ensure only the user and admins can access the data.",
+          "description": "Stores animal information for a specific user.",
           "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user."
-            },
-            {
-              "name": "amcDetailId",
-              "description": "The unique identifier for the AMC Detail."
-            }
+            { "name": "userId", "description": "The unique identifier for the user." },
+            { "name": "animalId", "description": "The unique identifier for the animal."}
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/movements/{movementId}",
+        "definition": {
+          "entityName": "AnimalMovement",
+          "schema": {
+            "$ref": "#/backend/entities/AnimalMovement"
+          },
+          "description": "Stores the movement history of each animal for a specific user.",
+          "params": [
+            { "name": "userId", "description": "The unique identifier for the user." },
+            { "name": "movementId", "description": "The unique identifier for the animal movement record."}
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/financial_records/{financialRecordId}",
+        "definition": {
+          "entityName": "FinancialRecord",
+          "schema": {
+            "$ref": "#/backend/entities/FinancialRecord"
+          },
+          "description": "Stores financial records for a specific user.",
+          "params": [
+            { "name": "userId", "description": "The unique identifier for the user." },
+            { "name": "financialRecordId", "description": "The unique identifier for the financial record."}
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/milk_records/{milkRecordId}",
+        "definition": {
+          "entityName": "MilkRecord",
+          "schema": { "$ref": "#/backend/entities/MilkRecord" },
+          "description": "Stores milk production records for a specific user.",
+          "params": [
+            { "name": "userId", "description": "The unique ID of the user." },
+            { "name": "milkRecordId", "description": "The unique ID for the milk record." }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/reports/{reportId}",
+        "definition": {
+          "entityName": "Report",
+          "schema": { "$ref": "#/backend/entities/Report" },
+          "description": "Stores generated reports for a specific user.",
+          "params": [
+            { "name": "userId", "description": "The unique ID of the user." },
+            { "name": "reportId", "description": "The unique ID for the report." }
           ]
         }
       },
@@ -294,54 +371,6 @@
             "params": [
                 { "name": "renewalId", "description": "The unique ID for the renewal request." }
             ]
-        }
-      },
-      {
-        "path": "/animals/{animalId}",
-        "definition": {
-          "entityName": "Animal",
-          "schema": {
-            "$ref": "#/backend/entities/Animal"
-          },
-          "description": "Stores animal information. Includes denormalized 'ownerId' for authorization independence, indicating which user created the animal record.",
-          "params": [
-            {
-              "name": "animalId",
-              "description": "The unique identifier for the animal."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/movements/{movementId}",
-        "definition": {
-          "entityName": "AnimalMovement",
-          "schema": {
-            "$ref": "#/backend/entities/AnimalMovement"
-          },
-          "description": "Stores the movement history of each animal. Includes a denormalized 'ownerId' for authorization, indicating which user recorded the movement.",
-          "params": [
-            {
-              "name": "movementId",
-              "description": "The unique identifier for the animal movement record."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/financial_records/{financialRecordId}",
-        "definition": {
-          "entityName": "FinancialRecord",
-          "schema": {
-            "$ref": "#/backend/entities/FinancialRecord"
-          },
-          "description": "Stores financial records. Includes denormalized 'ownerId' for authorization independence, indicating which user created the financial record.",
-          "params": [
-            {
-              "name": "financialRecordId",
-              "description": "The unique identifier for the financial record."
-            }
-          ]
         }
       },
       {
@@ -361,6 +390,6 @@
         }
       }
     ],
-    "reasoning": "The Firestore data structure is designed to support the GauRakshak application, focusing on secure and efficient data management for animal records, financial transactions, and user roles. The structure prioritizes authorization independence and facilitates simple, robust security rules. Path-based ownership is utilized for user-specific data, and membership maps are employed for collaborative data access.  The structure also incorporates segregation, with dedicated collections for animals and their movement history and financial records, to enforce homogeneous security postures and simplify security rules. Denormalization of user roles into related data collections ensures authorization independence, eliminating the need for `get()` calls in security rules. This ensures that security rules are atomic and easily debuggable. QAPs are achieved through clear separation of data based on ownership and role-based access control."
+    "reasoning": "The Firestore data structure is designed to support the GauRakshak application by adopting a user-centric model where each user's data (animals, movements, financials, etc.) is nested within their own document. This enhances data privacy and simplifies security rules by leveraging path-based ownership. Top-level collections like 'amc_renewals' and 'roles_admin' are maintained for global operations and administrative functions. This structure ensures that users can only access their own data, while admins have broader permissions, creating a secure and scalable architecture."
   }
 }

@@ -1,3 +1,6 @@
+
+'use client';
+
 import {
   Card,
   CardContent,
@@ -17,10 +20,34 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
-import { milkData } from '@/lib/placeholder-data';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query } from 'firebase/firestore';
+import type { MilkRecord } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
+
+function MilkRecordRowSkeleton() {
+    return (
+        <TableRow>
+            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+            <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+            <TableCell className="text-right"><Skeleton className="h-4 w-16" /></TableCell>
+        </TableRow>
+    )
+}
 
 export default function MilkRecordsPage() {
+  const firestore = useFirestore();
+  const { user } = useUser();
+
+  const milkRecordsQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(collection(firestore, `users/${user.uid}/milk_records`));
+  }, [user, firestore]);
+
+  const { data: milkData, isLoading } = useCollection<MilkRecord>(milkRecordsQuery);
+
   return (
     <Card>
       <CardHeader>
@@ -46,7 +73,8 @@ export default function MilkRecordsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {milkData.map((record) => (
+            {isLoading && Array.from({length: 5}).map((_, i) => <MilkRecordRowSkeleton key={i} />)}
+            {milkData?.map((record) => (
               <TableRow key={record.id}>
                 <TableCell>{record.date}</TableCell>
                 <TableCell className="font-medium">{record.animalTag}</TableCell>
@@ -58,12 +86,19 @@ export default function MilkRecordsPage() {
                 <TableCell className="text-right font-medium">{record.quantity.toFixed(2)}</TableCell>
               </TableRow>
             ))}
+            {milkData?.length === 0 && !isLoading && (
+                 <TableRow>
+                    <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
+                        No milk records found.
+                    </TableCell>
+                </TableRow>
+            )}
           </TableBody>
         </Table>
       </CardContent>
       <CardFooter>
         <div className="text-xs text-muted-foreground">
-          Showing <strong>1-{milkData.length}</strong> of <strong>{milkData.length}</strong> records
+          Showing <strong>{milkData?.length ?? 0}</strong> of <strong>{milkData?.length ?? 0}</strong> records
         </div>
       </CardFooter>
     </Card>

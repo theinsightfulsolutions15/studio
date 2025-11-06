@@ -29,7 +29,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogClose
 } from '@/components/ui/dialog';
@@ -171,7 +170,7 @@ export default function AnimalsPage() {
 
   const animalsCollection = useMemoFirebase(() => {
     if (!user || !firestore) return null;
-    return query(collection(firestore, 'animals'));
+    return query(collection(firestore, `users/${user.uid}/animals`));
   }, [user, firestore]);
   
   const { data: animals, isLoading } = useCollection<Animal>(animalsCollection);
@@ -277,7 +276,7 @@ export default function AnimalsPage() {
                     return;
                 }
 
-                const animalsColRef = collection(firestore, 'animals');
+                const animalsColRef = collection(firestore, `users/${user.uid}/animals`);
 
                 for (const row of json) {
                     const animalData: Omit<Animal, 'id'> = {
@@ -327,6 +326,7 @@ export default function AnimalsPage() {
     }
 
     setIsSubmitting(true);
+    const animalsColRef = collection(firestore, `users/${user.uid}/animals`);
 
     if (dialogMode === 'create') {
       if (animals?.some(animal => animal.govtTagNo === formData.govtTagNo)) {
@@ -335,7 +335,6 @@ export default function AnimalsPage() {
         return;
       }
       try {
-        const animalsColRef = collection(firestore, 'animals');
         await addDoc(animalsColRef, { ...formData, ownerId: user.uid });
         toast({ title: 'Success', description: 'New animal has been registered.' });
       } catch (error) {
@@ -349,7 +348,7 @@ export default function AnimalsPage() {
         return;
       }
       try {
-        const animalDocRef = firestoreDoc(firestore, 'animals', selectedAnimal.id);
+        const animalDocRef = firestoreDoc(firestore, `users/${user.uid}/animals`, selectedAnimal.id);
         await updateDocumentNonBlocking(animalDocRef, formData);
         toast({ title: 'Success', description: 'Animal details have been updated.' });
       } catch (error) {
@@ -669,5 +668,3 @@ export default function AnimalsPage() {
     </>
   );
 }
-
-    

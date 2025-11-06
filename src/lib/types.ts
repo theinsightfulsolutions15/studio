@@ -13,7 +13,6 @@ export type Animal = {
   tagColor: string;
   identificationMark?: string;
   imageUrl?: string;
-  imageHint?: string;
 };
 
 export type User = {
@@ -33,8 +32,8 @@ export type User = {
 export type FinancialRecord = {
   id: string;
   date: string;
-  type: 'Receipt' | 'Payment' | 'Expense' | 'AMC';
-  category: string;
+  recordType: 'Receipt' | 'Payment' | 'Expense' | 'Milk Record' | 'Bank Record';
+  category?: string;
   amount: number;
   description: string;
   ownerId?: string;
@@ -48,6 +47,7 @@ export type MilkRecord = {
   animalTag: string;
   quantity: number; // in liters
   time: 'Morning' | 'Evening';
+  ownerId?: string;
 };
 
 export type NavItem = {

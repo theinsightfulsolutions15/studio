@@ -134,14 +134,14 @@ export default function MovementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const animalsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'animals');
-  }, [firestore]);
+    if (!firestore || !user) return null;
+    return collection(firestore, `users/${user.uid}/animals`);
+  }, [firestore, user]);
   const { data: animals, isLoading: isLoadingAnimals } = useCollection<Animal>(animalsQuery);
 
   const movementsQuery = useMemoFirebase(() => {
       if (!firestore || !user) return null;
-      return query(collection(firestore, 'movements'));
+      return query(collection(firestore, `users/${user.uid}/movements`));
   }, [firestore, user]);
 
   const { data: allMovements, isLoading: isLoadingAll } = useCollection<AnimalMovement>(movementsQuery);
@@ -194,11 +194,11 @@ export default function MovementPage() {
     
     try {
         if (dialogMode === 'create') {
-            const movementColRef = collection(firestore, 'movements');
+            const movementColRef = collection(firestore, `users/${user.uid}/movements`);
             await addDocumentNonBlocking(movementColRef, { ...formData, ownerId: user.uid });
             toast({ title: 'Success', description: 'New movement record has been added.' });
         } else if (dialogMode === 'edit' && selectedMovement) {
-            const movementDocRef = doc(firestore, 'movements', selectedMovement.id);
+            const movementDocRef = doc(firestore, `users/${user.uid}/movements`, selectedMovement.id);
             await updateDocumentNonBlocking(movementDocRef, formData);
             toast({ title: 'Success', description: 'Movement record has been updated.' });
         }
@@ -322,5 +322,3 @@ export default function MovementPage() {
     </>
   );
 }
-
-    

@@ -54,16 +54,16 @@ export default function FinancePage() {
 
   const financialRecordsQuery = useCollection(
     useMemoFirebase(
-      () => (user && firestore ? query(collection(firestore, 'financial_records')) : null),
+      () => (user && firestore ? query(collection(firestore, `users/${user.uid}/financial_records`)) : null),
       [user, firestore]
     )
   );
 
   const { data: financialData, isLoading } = financialRecordsQuery;
   
-  const receipts = financialData?.filter((t) => t.type === 'Receipt');
-  const payments = financialData?.filter((t) => t.type === 'Payment');
-  const expenses = financialData?.filter((t) => t.type === 'Expense');
+  const receipts = financialData?.filter((t) => t.recordType === 'Receipt');
+  const payments = financialData?.filter((t) => t.recordType === 'Payment');
+  const expenses = financialData?.filter((t) => t.recordType === 'Expense');
 
   return (
     <Card>
@@ -142,15 +142,15 @@ function TransactionsTable({
             <TableCell>
               <Badge
                 variant={
-                  record.type === 'Receipt'
+                  record.recordType === 'Receipt'
                     ? 'secondary'
-                    : record.type === 'Expense'
+                    : record.recordType === 'Expense'
                     ? 'destructive'
                     : 'outline'
                 }
                 className="bg-opacity-80"
               >
-                {record.type}
+                {record.recordType}
               </Badge>
             </TableCell>
             <TableCell className="hidden sm:table-cell">

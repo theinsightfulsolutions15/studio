@@ -1,36 +1,4 @@
 
-/**
- * @fileoverview Firestore Security Rules for the GauRakshak application.
- *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for personal data (users and their associated AMC details),
- * and a public-read with owner-write model for animal records and financial transactions. Administrative privileges
- * are managed through a dedicated collection, `roles_admin`.
- *
- * Data Structure:
- * - `/users/{userId}`: Stores personal user data. Only the user themselves can read or write their own document.
- * - `/animals/{animalId}`: Stores animal records. These are publicly readable, but only the creating user can modify or delete them.
- *   Each animal document MUST contain a denormalized `ownerId` field that matches the user who created it.
- * - `/movements/{movementId}`: Stores movement history for each animal. Inherits access control from the parent animal document.
- *   The existence of the parent document must be validated before allowing operations on the movement records.
- * - `/financial_records/{financialRecordId}`: Stores financial records. Publicly readable, but write access is restricted to the creating user.
- *   Each financial record MUST contain a denormalized `ownerId` field indicating the creator.
- * - `/amc_renewals/{renewalId}`: Stores user-submitted AMC renewal requests. Readable by admins, writable by the user who owns it.
- * - `/roles_admin/{userId}`: Presence of a document in this collection grants the user admin privileges.
- * - `/gaushala_profile/{profileId}`: Stores the central profile for the Gaushala.
- *
- * Key Security Decisions:
- * - User listing is explicitly disallowed for non-admins.
- * - The default security posture is strict: if a relationship or permission is not explicitly granted, it is denied.
- * - Data validation is minimized to facilitate rapid prototyping. Only authorization-critical fields are validated.
- *
- * Denormalization for Authorization:
- * - `animals` and `financial_records` collections include an `ownerId` field to simplify write authorization and avoid `get()` calls.
- * - Admin status is determined by the presence of a document in the `roles_admin` collection, avoiding complex role lookups.
- *
- * Structural Segregation:
- * - Private user data is stored under the `/users/{userId}` path, while public animal and financial data reside in top-level collections.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -55,7 +23,7 @@ service cloud.firestore {
     function isAdmin() {
       return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
-
+    
     /**
      * Helper function to check if the user's account is active and not expired.
      */
@@ -76,52 +44,55 @@ service cloud.firestore {
         return validityMillis >= request.time.toMillis() && userDoc.status == 'Active';
     }
 
-
     /**
-     * Rules for user profiles.
+     * Rules for user profiles and their nested data.
      */
     match /users/{userId} {
       // Admins can perform any action on any user.
       // Regular users can only read, update, or delete their own document.
       allow read, update, delete: if isAdmin() || isOwner(userId);
+      allow list: if isAdmin(); // Only admins can list all users.
+      allow create: if isSignedIn(); // Any signed-in user can create their own profile.
 
-      // Only admins can list all users.
-      allow list: if isAdmin();
+      /**
+       * Rules for nested animal records.
+       */
+      match /animals/{animalId} {
+        // Owner can do anything, Admins can do anything.
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+      
+      /**
+       * Rules for nested movement records.
+       */
+      match /movements/{movementId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+      
+      /**
+       * Rules for nested financial records.
+       */
+      match /financial_records/{financialRecordId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
 
-      // Any signed-in user can create their own profile document.
-      // Admins can also create user documents.
-      allow create: if isSignedIn();
+      /**
+       * Rules for nested milk records.
+       */
+      match /milk_records/{milkRecordId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+       
+      /**
+       * Rules for nested reports.
+       */
+       match /reports/{reportId} {
+         allow read, write: if isOwner(userId) || isAdmin();
+       }
     }
 
     /**
-     * Rules for animal records and their movement subcollection.
-     */
-    match /animals/{animalId} {
-      allow read: if isSignedIn();
-      // Only active, non-expired users or admins can write to animal records.
-      allow write: if isAccountActive() || isAdmin();
-    }
-    
-    /**
-     * Rules for movement records.
-     */
-    match /movements/{movementId} {
-        // Only active, non-expired users or admins can read or write to movement records.
-        allow read, write: if isAccountActive() || isAdmin();
-    }
-
-
-    /**
-     * Rules for financial records.
-     */
-    match /financial_records/{financialRecordId} {
-      allow read: if isSignedIn();
-      // Only active, non-expired users or admins can write to financial records.
-      allow write: if isAccountActive() || isAdmin();
-    }
-
-    /**
-     * Rules for AMC renewal requests.
+     * Rules for AMC renewal requests (top-level collection).
      */
     match /amc_renewals/{renewalId} {
       // Users can create their own renewal requests.
@@ -143,16 +114,5 @@ service cloud.firestore {
       // Nobody can delete roles.
       allow delete: if false;
     }
-
-     /**
-     * Rules for the Gaushala Profile.
-     */
-    match /gaushala_profile/{profileId} {
-      // All signed-in users can read the profile.
-      allow read: if isSignedIn();
-      // Only admins can create or update the profile.
-      allow write: if isAdmin();
-    }
   }
 }
-
