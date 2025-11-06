@@ -12,14 +12,15 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import Link from 'next/link';
-import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell } from 'lucide-react';
+import { Bell, UserCheck, ShieldCheck, Activity } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { doc } from 'firebase/firestore';
-import type { User as AppUser } from '@/lib/types';
+import { doc, collection, query, where } from 'firebase/firestore';
+import type { User as AppUser, AmcRenewal, Animal } from '@/lib/types';
+import { formatDistanceToNow } from 'date-fns';
 
 function DateTimeDisplay() {
   const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
@@ -72,6 +73,25 @@ export default function Header() {
 
   const { data: userData } = useDoc<AppUser>(userDocRef);
 
+  const isAdmin = userData?.role === 'Admin';
+
+  const pendingUsersQuery = useMemoFirebase(() => (
+    isAdmin && firestore ? query(collection(firestore, 'users'), where('status', '==', 'Pending')) : null
+  ), [isAdmin, firestore]);
+  const { data: pendingUsers } = useCollection<AppUser>(pendingUsersQuery);
+
+  const pendingRenewalsQuery = useMemoFirebase(() => (
+      isAdmin && firestore ? query(collection(firestore, 'amc_renewals'), where('status', '==', 'Pending')) : null
+  ), [isAdmin, firestore]);
+  const { data: pendingRenewals } = useCollection<AmcRenewal>(pendingRenewalsQuery);
+
+  const sickAnimalsQuery = useMemoFirebase(() => (
+      user && firestore ? query(collection(firestore, `users/${user.uid}/animals`), where('healthStatus', 'in', ['Sick', 'Under Treatment'])) : null
+  ), [user, firestore]);
+  const { data: sickAnimals } = useCollection<Animal>(sickAnimalsQuery);
+
+  const notificationsCount = (pendingUsers?.length ?? 0) + (pendingRenewals?.length ?? 0) + (sickAnimals?.length ?? 0);
+
   const handleLogout = () => {
     if (auth) {
       signOut(auth).then(() => {
@@ -97,27 +117,56 @@ export default function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative rounded-full">
               <Bell className="h-5 w-5" />
-              <Badge className="absolute -top-1 -right-1 h-4 w-4 justify-center rounded-full p-0 text-xs">3</Badge>
+              {notificationsCount > 0 && (
+                <Badge className="absolute -top-1 -right-1 h-4 w-4 justify-center rounded-full p-0 text-xs">{notificationsCount}</Badge>
+              )}
               <span className="sr-only">Toggle notifications</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[300px]">
+          <DropdownMenuContent align="end" className="w-[350px]">
             <DropdownMenuLabel>Notifications</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex flex-col items-start gap-1">
-                <p className="font-medium">New User Pending</p>
-                <p className="text-xs text-muted-foreground">A new user has registered and is waiting for approval.</p>
-            </DropdownMenuItem>
-             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex flex-col items-start gap-1">
-                <p className="font-medium">Animal Record Updated</p>
-                <p className="text-xs text-muted-foreground">Health status of UID12345 changed to 'Sick'.</p>
-            </DropdownMenuItem>
-             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex flex-col items-start gap-1">
-                <p className="font-medium">New Donation Received</p>
-                <p className="text-xs text-muted-foreground">A donation of ₹5000 was received.</p>
-            </DropdownMenuItem>
+            {notificationsCount === 0 ? (
+                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                    You have no new notifications.
+                </div>
+            ) : (
+                <>
+                {pendingUsers?.map(u => (
+                    <DropdownMenuItem key={u.id} asChild>
+                        <Link href="/dashboard/user-approvals" className="flex flex-col items-start gap-1">
+                            <div className="flex items-center gap-2">
+                                <UserCheck className="h-4 w-4 text-blue-500" />
+                                <p className="font-medium">New User Pending Approval</p>
+                            </div>
+                            <p className="pl-6 text-xs text-muted-foreground">{u.name} is waiting for approval.</p>
+                        </Link>
+                    </DropdownMenuItem>
+                ))}
+                {pendingRenewals?.map(r => (
+                     <DropdownMenuItem key={r.id} asChild>
+                        <Link href="/dashboard/amc" className="flex flex-col items-start gap-1">
+                           <div className="flex items-center gap-2">
+                                <ShieldCheck className="h-4 w-4 text-green-500" />
+                                <p className="font-medium">New AMC Renewal Request</p>
+                            </div>
+                            <p className="pl-6 text-xs text-muted-foreground">{r.userName} submitted a renewal request.</p>
+                        </Link>
+                    </DropdownMenuItem>
+                ))}
+                {sickAnimals?.map(a => (
+                     <DropdownMenuItem key={a.id} asChild>
+                        <Link href="/dashboard/master/animals" className="flex flex-col items-start gap-1">
+                            <div className="flex items-center gap-2">
+                                <Activity className="h-4 w-4 text-red-500" />
+                                <p className="font-medium">Animal Health Alert</p>
+                            </div>
+                            <p className="pl-6 text-xs text-muted-foreground">Animal {a.govtTagNo} is {a.healthStatus}.</p>
+                        </Link>
+                    </DropdownMenuItem>
+                ))}
+                </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
