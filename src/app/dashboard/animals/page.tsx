@@ -36,7 +36,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MoreHorizontal, PlusCircle, Search, FileDown, FileUp } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Search, FileDown, FileUp, Camera, Upload } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, writeBatch, doc as firestoreDoc, addDoc } from 'firebase/firestore';
 import type { Animal } from '@/lib/types';
@@ -46,11 +46,14 @@ import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import Image from 'next/image';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
 function AnimalRowSkeleton() {
   return (
     <TableRow>
+      <TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell>
       <TableCell><Skeleton className="h-4 w-16" /></TableCell>
       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
       <TableCell><Skeleton className="h-4 w-16" /></TableCell>
@@ -77,6 +80,7 @@ const initialAnimalState: Omit<Animal, 'id' | 'ownerId'> = {
     healthStatus: 'Healthy',
     tagColor: '',
     identificationMark: '',
+    imageUrl: '',
 };
 
 export default function AnimalsPage() {
@@ -89,6 +93,75 @@ export default function AnimalsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredAnimals, setFilteredAnimals] = useState<Animal[] | null>(null);
+
+  // Image Capture State
+  const [isCaptureDialogOpen, setIsCaptureDialogOpen] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+
+
+  useEffect(() => {
+    if (isCaptureDialogOpen) {
+      const getCameraPermission = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          setHasCameraPermission(true);
+
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (error) {
+          console.error('Error accessing camera:', error);
+          setHasCameraPermission(false);
+          toast({
+            variant: 'destructive',
+            title: 'Camera Access Denied',
+            description: 'Please enable camera permissions in your browser settings.',
+          });
+        }
+      };
+      getCameraPermission();
+    } else {
+        // Stop camera stream when dialog closes
+        if (videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach(track => track.stop());
+            videoRef.current.srcObject = null;
+        }
+    }
+  }, [isCaptureDialogOpen, toast]);
+
+
+  const handleCaptureImage = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const context = canvas.getContext('2d');
+      if (context) {
+        context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        const dataUri = canvas.toDataURL('image/jpeg');
+        setCapturedImage(dataUri);
+        setNewAnimal({ ...newAnimal, imageUrl: dataUri });
+        setIsCaptureDialogOpen(false);
+      }
+    }
+  };
+  
+   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUri = e.target?.result as string;
+        setCapturedImage(dataUri);
+        setNewAnimal({ ...newAnimal, imageUrl: dataUri });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
 
   const animalsCollection = useMemoFirebase(() => {
@@ -169,7 +242,6 @@ export default function AnimalsPage() {
                   return;
                 }
 
-                // Check for duplicates before committing
                 const existingTagNos = new Set(animals?.map(a => a.govtTagNo));
                 const importTagNos = new Set<string>();
                 let duplicateFoundInFile = false;
@@ -241,7 +313,6 @@ export default function AnimalsPage() {
         };
         reader.readAsBinaryString(file);
     }
-     // Reset the file input so the same file can be uploaded again
     if(event.target) {
         event.target.value = '';
     }
@@ -257,7 +328,6 @@ export default function AnimalsPage() {
         return;
     }
 
-    // Check for duplicate govtTagNo
     if (animals?.some(animal => animal.govtTagNo === newAnimal.govtTagNo)) {
         toast({ variant: 'destructive', title: 'Registration Failed', description: `An animal with Tag No "${newAnimal.govtTagNo}" already exists.` });
         return;
@@ -269,6 +339,7 @@ export default function AnimalsPage() {
         await addDoc(animalsColRef, { ...newAnimal, ownerId: user.uid });
         toast({ title: 'Success', description: 'New animal has been registered.' });
         setNewAnimal(initialAnimalState);
+        setCapturedImage(null);
         setIsDialogOpen(false);
     } catch (error) {
         console.error("Error registering animal:", error);
@@ -280,6 +351,7 @@ export default function AnimalsPage() {
 
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -319,86 +391,114 @@ export default function AnimalsPage() {
                             Register Animal
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px]">
+                    <DialogContent className="sm:max-w-4xl">
                         <DialogHeader>
                             <DialogTitle>Register a New Animal</DialogTitle>
                             <DialogDescription>
                                 Fill in the details below to add a new animal to the Gaushala records.
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                             <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="type">Type</Label>
-                                    <Select value={newAnimal.type} onValueChange={(value) => setNewAnimal({...newAnimal, type: value })}>
-                                        <SelectTrigger id="type">
-                                            <SelectValue placeholder="Select type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Cow">Cow</SelectItem>
-                                            <SelectItem value="Buffalo">Buffalo</SelectItem>
-                                            <SelectItem value="Bull">Bull</SelectItem>
-                                            <SelectItem value="Calf">Calf</SelectItem>
-                                            <SelectItem value="Other">Other</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                        <div className="grid md:grid-cols-3 gap-6 py-4">
+                           <div className="md:col-span-1 flex flex-col items-center gap-4">
+                                <div className="w-full aspect-square rounded-md bg-muted flex items-center justify-center overflow-hidden">
+                                     {capturedImage ? (
+                                        <Image src={capturedImage} alt="Animal" width={400} height={400} className="object-cover h-full w-full" />
+                                    ) : (
+                                        <Camera className="h-16 w-16 text-muted-foreground" />
+                                    )}
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="govtTagNo">Govt. Tag No.</Label>
-                                    <Input id="govtTagNo" value={newAnimal.govtTagNo} onChange={(e) => setNewAnimal({ ...newAnimal, govtTagNo: e.target.value })} placeholder="UID12345" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="breed">Breed</Label>
-                                    <Input id="breed" value={newAnimal.breed} onChange={(e) => setNewAnimal({ ...newAnimal, breed: e.target.value })} placeholder="e.g., Gir, Murrah" />
-                                </div>
-                                 <div className="space-y-2">
-                                    <Label htmlFor="color">Color</Label>
-                                    <Input id="color" value={newAnimal.color} onChange={(e) => setNewAnimal({ ...newAnimal, color: e.target.value })} placeholder="e.g., Brown, Black" />
+                                <div className="w-full grid grid-cols-2 gap-2">
+                                    <Button variant="outline" onClick={() => setIsCaptureDialogOpen(true)}>
+                                        <Camera className="mr-2 h-4 w-4" />
+                                        Capture
+                                    </Button>
+                                    <Button variant="outline" onClick={() => uploadInputRef.current?.click()}>
+                                        <Upload className="mr-2 h-4 w-4" />
+                                        Upload
+                                    </Button>
+                                    <input
+                                        type="file"
+                                        ref={uploadInputRef}
+                                        onChange={handleImageUpload}
+                                        className="hidden"
+                                        accept="image/*"
+                                    />
                                 </div>
                             </div>
-                             <div className="grid grid-cols-2 gap-4">
-                                 <div className="space-y-2">
-                                    <Label htmlFor="gender">Gender</Label>
-                                    <Select value={newAnimal.gender} onValueChange={(value: 'Male' | 'Female') => setNewAnimal({ ...newAnimal, gender: value })}>
-                                        <SelectTrigger id="gender">
-                                            <SelectValue placeholder="Select gender" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Female">Female</SelectItem>
-                                            <SelectItem value="Male">Male</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                            <div className="md:col-span-2 grid gap-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="type">Type</Label>
+                                        <Select value={newAnimal.type} onValueChange={(value) => setNewAnimal({...newAnimal, type: value })}>
+                                            <SelectTrigger id="type">
+                                                <SelectValue placeholder="Select type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Cow">Cow</SelectItem>
+                                                <SelectItem value="Buffalo">Buffalo</SelectItem>
+                                                <SelectItem value="Bull">Bull</SelectItem>
+                                                <SelectItem value="Calf">Calf</SelectItem>
+                                                <SelectItem value="Other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="govtTagNo">Govt. Tag No.</Label>
+                                        <Input id="govtTagNo" value={newAnimal.govtTagNo} onChange={(e) => setNewAnimal({ ...newAnimal, govtTagNo: e.target.value })} placeholder="UID12345" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="breed">Breed</Label>
+                                        <Input id="breed" value={newAnimal.breed} onChange={(e) => setNewAnimal({ ...newAnimal, breed: e.target.value })} placeholder="e.g., Gir, Murrah" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="color">Color</Label>
+                                        <Input id="color" value={newAnimal.color} onChange={(e) => setNewAnimal({ ...newAnimal, color: e.target.value })} placeholder="e.g., Brown, Black" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="gender">Gender</Label>
+                                        <Select value={newAnimal.gender} onValueChange={(value: 'Male' | 'Female') => setNewAnimal({ ...newAnimal, gender: value })}>
+                                            <SelectTrigger id="gender">
+                                                <SelectValue placeholder="Select gender" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Female">Female</SelectItem>
+                                                <SelectItem value="Male">Male</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="yearOfBirth">Year of Birth</Label>
+                                        <Input id="yearOfBirth" type="number" value={newAnimal.yearOfBirth} onChange={(e) => setNewAnimal({ ...newAnimal, yearOfBirth: parseInt(e.target.value) })} placeholder="e.g., 2020" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="healthStatus">Health Status</Label>
+                                        <Select value={newAnimal.healthStatus} onValueChange={(value: 'Healthy' | 'Sick' | 'Under Treatment') => setNewAnimal({ ...newAnimal, healthStatus: value })}>
+                                            <SelectTrigger id="healthStatus">
+                                                <SelectValue placeholder="Select status" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Healthy">Healthy</SelectItem>
+                                                <SelectItem value="Sick">Sick</SelectItem>
+                                                <SelectItem value="Under Treatment">Under Treatment</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="tagColor">Tag Color</Label>
+                                        <Input id="tagColor" value={newAnimal.tagColor} onChange={(e) => setNewAnimal({ ...newAnimal, tagColor: e.target.value })} placeholder="e.g., Yellow, Blue" />
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="yearOfBirth">Year of Birth</Label>
-                                    <Input id="yearOfBirth" type="number" value={newAnimal.yearOfBirth} onChange={(e) => setNewAnimal({ ...newAnimal, yearOfBirth: parseInt(e.target.value) })} placeholder="e.g., 2020" />
+                                    <Label htmlFor="identificationMark">Identification Mark</Label>
+                                    <Input id="identificationMark" value={newAnimal.identificationMark} onChange={(e) => setNewAnimal({ ...newAnimal, identificationMark: e.target.value })} placeholder="Any unique marks" />
                                 </div>
-                            </div>
-                             <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="healthStatus">Health Status</Label>
-                                    <Select value={newAnimal.healthStatus} onValueChange={(value: 'Healthy' | 'Sick' | 'Under Treatment') => setNewAnimal({ ...newAnimal, healthStatus: value })}>
-                                        <SelectTrigger id="healthStatus">
-                                            <SelectValue placeholder="Select status" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Healthy">Healthy</SelectItem>
-                                            <SelectItem value="Sick">Sick</SelectItem>
-                                            <SelectItem value="Under Treatment">Under Treatment</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="tagColor">Tag Color</Label>
-                                    <Input id="tagColor" value={newAnimal.tagColor} onChange={(e) => setNewAnimal({ ...newAnimal, tagColor: e.target.value })} placeholder="e.g., Yellow, Blue" />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="identificationMark">Identification Mark</Label>
-                                <Input id="identificationMark" value={newAnimal.identificationMark} onChange={(e) => setNewAnimal({ ...newAnimal, identificationMark: e.target.value })} placeholder="Any unique marks" />
-                            </div>
+                           </div>
                         </div>
                         <DialogFooter>
                             <DialogClose asChild>
@@ -417,6 +517,7 @@ export default function AnimalsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[80px]">Image</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Tag No</TableHead>
               <TableHead>Breed</TableHead>
@@ -435,6 +536,15 @@ export default function AnimalsPage() {
             {(isLoading || !user) && Array.from({ length: 5 }).map((_, i) => <AnimalRowSkeleton key={i} />)}
             {filteredAnimals?.map((animal) => (
               <TableRow key={animal.id}>
+                 <TableCell>
+                    <Image 
+                        src={animal.imageUrl || "https://picsum.photos/seed/placeholder/80/80"} 
+                        alt={animal.breed}
+                        width={40}
+                        height={40}
+                        className="rounded-md object-cover aspect-square"
+                    />
+                </TableCell>
                 <TableCell>{animal.type}</TableCell>
                 <TableCell className="font-medium">{animal.govtTagNo}</TableCell>
                 <TableCell>{animal.breed}</TableCell>
@@ -467,7 +577,7 @@ export default function AnimalsPage() {
             ))}
              {filteredAnimals && filteredAnimals.length === 0 && !isLoading && (
                 <TableRow>
-                    <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-10 text-muted-foreground">
                         No animals found{searchTerm && ` for "${searchTerm}"`}.
                     </TableCell>
                 </TableRow>
@@ -481,7 +591,38 @@ export default function AnimalsPage() {
         </div>
       </CardFooter>
     </Card>
+
+    <Dialog open={isCaptureDialogOpen} onOpenChange={setIsCaptureDialogOpen}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Capture Animal Photo</DialogTitle>
+          <DialogDescription>
+            Position the animal in the frame and click "Capture" to take a photo.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col items-center gap-4 py-4">
+          <div className="w-full aspect-video bg-black rounded-md overflow-hidden flex items-center justify-center">
+            <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+          </div>
+          {hasCameraPermission === false && (
+            <Alert variant="destructive">
+              <Camera className="h-4 w-4" />
+              <AlertTitle>Camera Access Required</AlertTitle>
+              <AlertDescription>
+                Please allow camera access in your browser to use this feature.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="secondary" onClick={() => setIsCaptureDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleCaptureImage} disabled={!hasCameraPermission}>
+            <Camera className="mr-2 h-4 w-4" />
+            Capture Photo
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
-
-    
