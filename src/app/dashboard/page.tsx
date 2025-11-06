@@ -38,6 +38,7 @@ import { useState, useEffect } from 'react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { User as AppUser } from '@/lib/types';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 
 const chartConfig = {
@@ -67,6 +68,7 @@ function AmcRenewalForm() {
     const [transactionType, setTransactionType] = useState<string>('');
     const [transactionDate, setTransactionDate] = useState<Date | undefined>(new Date());
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
 
     const handleSubmit = async () => {
         if (!user || !firestore) {
@@ -96,6 +98,7 @@ function AmcRenewalForm() {
             setAmount('');
             setTransactionType('');
             setTransactionDate(new Date());
+            setIsOpen(false);
         } catch (error) {
             console.error('Error submitting AMC:', error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit AMC renewal.' });
@@ -105,53 +108,62 @@ function AmcRenewalForm() {
     };
 
     return (
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
          <Card className="border-amber-500/50 bg-amber-500/10">
             <CardHeader>
-                <div className="flex items-center gap-3">
-                    <FileWarning className="h-6 w-6 text-amber-600" />
-                    <div>
-                        <CardTitle className="text-amber-800">Account Expired</CardTitle>
-                        <CardDescription className="text-amber-700">Your AMC has expired. Please renew to restore full access.</CardDescription>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <FileWarning className="h-6 w-6 text-amber-600" />
+                        <div>
+                            <CardTitle className="text-amber-800">Account Expired</CardTitle>
+                            <CardDescription className="text-amber-700">Your AMC has expired. Please renew to restore full access.</CardDescription>
+                        </div>
                     </div>
+                    <CollapsibleTrigger asChild>
+                         <Button className="w-full sm:w-auto" variant="secondary">Click for Renewal</Button>
+                    </CollapsibleTrigger>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-                 <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                    <div className="space-y-2">
-                        <Label htmlFor="customerId">Customer ID</Label>
-                        <Input id="customerId" value={user?.customerId || ''} disabled />
+            <CollapsibleContent>
+                <CardContent className="space-y-4 pt-4 border-t border-amber-500/30">
+                     <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                        <div className="space-y-2">
+                            <Label htmlFor="customerId">Customer ID</Label>
+                            <Input id="customerId" value={user?.customerId || ''} disabled />
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="amount">Amount</Label>
+                            <Input id="amount" type="number" placeholder="Enter amount" value={amount} onChange={e => setAmount(Number(e.target.value))} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="transactionType">Transaction Type</Label>
+                            <Select onValueChange={setTransactionType} value={transactionType}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="RTGS">RTGS</SelectItem>
+                                    <SelectItem value="NEFT">NEFT</SelectItem>
+                                    <SelectItem value="UPI">UPI</SelectItem>
+                                    <SelectItem value="Cash">Cash</SelectItem>
+                                    <SelectItem value="Other">Other</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="transactionDate">Date</Label>
+                            <DatePicker date={transactionDate} setDate={setTransactionDate} />
+                        </div>
                     </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="amount">Amount</Label>
-                        <Input id="amount" type="number" placeholder="Enter amount" value={amount} onChange={e => setAmount(Number(e.target.value))} />
+                     <div className="flex justify-end">
+                        <Button onClick={handleSubmit} disabled={isSubmitting || isUserLoading} className="w-full sm:w-auto">
+                            {isSubmitting ? 'Submitting...' : 'Submit for Renewal'}
+                        </Button>
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="transactionType">Transaction Type</Label>
-                        <Select onValueChange={setTransactionType} value={transactionType}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="RTGS">RTGS</SelectItem>
-                                <SelectItem value="NEFT">NEFT</SelectItem>
-                                <SelectItem value="UPI">UPI</SelectItem>
-                                <SelectItem value="Cash">Cash</SelectItem>
-                                <SelectItem value="Other">Other</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="transactionDate">Date</Label>
-                        <DatePicker date={transactionDate} setDate={setTransactionDate} />
-                    </div>
-                </div>
-                 <div className="flex justify-end">
-                    <Button onClick={handleSubmit} disabled={isSubmitting || isUserLoading} className="w-full sm:w-auto">
-                        {isSubmitting ? 'Submitting...' : 'Submit for Renewal'}
-                    </Button>
-                </div>
-            </CardContent>
+                </CardContent>
+            </CollapsibleContent>
         </Card>
+        </Collapsible>
     )
 }
 
