@@ -26,11 +26,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MoreHorizontal, PlusCircle, Search, FileDown, FileUp } from 'lucide-react';
-import Image from 'next/image';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, writeBatch } from 'firebase/firestore';
 import type { Animal } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useRef } from 'react';
+import * as XLSX from 'xlsx';
+import { useToast } from '@/hooks/use-toast';
 
 function AnimalRowSkeleton() {
   return (
@@ -54,6 +56,9 @@ function AnimalRowSkeleton() {
 export default function AnimalsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   const animalsCollection = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -61,6 +66,93 @@ export default function AnimalsPage() {
   }, [user, firestore]);
   
   const { data: animals, isLoading } = useCollection<Animal>(animalsCollection);
+
+  const handleExport = () => {
+    if (!animals) {
+        toast({
+            variant: "destructive",
+            title: "Export Failed",
+            description: "No animal data to export.",
+        });
+        return;
+    }
+    const worksheet = XLSX.utils.json_to_sheet(animals.map(animal => {
+        // eslint-disable-next-line no-unused-vars
+        const { id, ownerId, ...rest } = animal;
+        return rest;
+    }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Animals");
+    XLSX.writeFile(workbook, "Gaushala_Animals.xlsx");
+     toast({
+        title: "Export Successful",
+        description: "Animal data has been exported to Gaushala_Animals.xlsx.",
+    });
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && firestore && user) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json: (Omit<Animal, 'id' | 'ownerId'> & { id?: string })[] = XLSX.utils.sheet_to_json(worksheet);
+
+                if (json.length === 0) {
+                  toast({ variant: 'destructive', title: "Import Failed", description: "The Excel file is empty." });
+                  return;
+                }
+
+                const batch = writeBatch(firestore);
+                const animalsColRef = collection(firestore, 'animals');
+
+                json.forEach((animalData) => {
+                    // If an ID exists, update it. Otherwise, create a new doc.
+                    const docRef = animalData.id 
+                        ? collection(firestore, 'animals', animalData.id) 
+                        : collection(firestore, 'animals');
+                    
+                    const finalData: Partial<Animal> = {
+                        ...animalData,
+                        ownerId: user.uid,
+                    };
+                    delete finalData.id; // Remove ID from data payload
+
+                    batch.set(docRef, finalData, { merge: true });
+                });
+
+                await batch.commit();
+
+                toast({
+                    title: "Import Successful",
+                    description: `${json.length} animal records have been imported.`,
+                });
+
+            } catch (error) {
+                console.error("Import error:", error);
+                toast({
+                    variant: "destructive",
+                    title: "Import Failed",
+                    description: "Could not import the file. Please check the file format and try again.",
+                });
+            }
+        };
+        reader.readAsBinaryString(file);
+    }
+     // Reset the file input so the same file can be uploaded again
+    if(event.target) {
+        event.target.value = '';
+    }
+  };
+
 
   return (
     <Card>
@@ -75,11 +167,18 @@ export default function AnimalsPage() {
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input placeholder="Search animals..." className="pl-8 w-full min-w-[150px] md:w-[250px] lg:w-[300px]" />
                 </div>
-                 <Button variant="outline">
+                 <Button variant="outline" onClick={handleImportClick}>
                     <FileUp className="mr-2 h-4 w-4" />
                     Import
                 </Button>
-                <Button variant="outline">
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept=".xlsx, .xls"
+                />
+                <Button variant="outline" onClick={handleExport}>
                     <FileDown className="mr-2 h-4 w-4" />
                     Export
                 </Button>
@@ -142,12 +241,19 @@ export default function AnimalsPage() {
                 </TableCell>
               </TableRow>
             ))}
+             {animals && animals.length === 0 && !isLoading && (
+                <TableRow>
+                    <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
+                        No animals found.
+                    </TableCell>
+                </TableRow>
+            )}
           </TableBody>
         </Table>
       </CardContent>
        <CardFooter>
         <div className="text-xs text-muted-foreground">
-          Showing <strong>1-{animals?.length ?? 0}</strong> of <strong>{animals?.length ?? 0}</strong> animals
+          Showing <strong>{animals?.length ?? 0}</strong> of <strong>{animals?.length ?? 0}</strong> animals
         </div>
       </CardFooter>
     </Card>
