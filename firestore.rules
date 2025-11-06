@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Firestore Security Rules for the GauRakshak application.
  *
@@ -128,9 +129,10 @@ service cloud.firestore {
      */
     match /roles_admin/{userId} {
       allow get: if isSignedIn();
-      allow list, delete: if false; // Nobody can list or delete roles directly.
+      allow list: if false; // Nobody can list roles directly.
       // Only an admin can create or update a role document.
       allow write: if isAdmin() || isOwner(userId);
+      allow delete: if false;
     }
   }
 }
