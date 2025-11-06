@@ -83,7 +83,7 @@ function MovementsTable({ movements, isLoading, onEdit }: { movements: (AnimalMo
                 <TableCell>{new Date(movement.date).toLocaleDateString()}</TableCell>
                 <TableCell className="font-medium">{movement.animalGovtTagNo || movement.animalId}</TableCell>
                 <TableCell>
-                    <Badge variant={movement.type === 'Entry' ? 'secondary' : 'destructive'} className="bg-opacity-80">
+                    <Badge className={movement.type === 'Entry' ? "bg-green-600 text-white" : "bg-red-600 text-white"}>
                         {movement.type}
                     </Badge>
                 </TableCell>
