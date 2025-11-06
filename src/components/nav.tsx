@@ -13,6 +13,7 @@ import {
   Truck,
   ShieldCheck,
   UserCheck,
+  BookUser,
 } from 'lucide-react';
 import { doc } from 'firebase/firestore';
 import {
@@ -37,6 +38,7 @@ const baseNavItems: NavItem[] = [
 ];
 
 const adminNavItems: NavItem[] = [
+    { href: '/dashboard/master/accounts', title: 'Masters', icon: BookUser },
     { href: '/dashboard/users', title: 'Users', icon: Users },
     { href: '/dashboard/user-approvals', title: 'User Approvals', icon: UserCheck },
     { href: '/dashboard/amc', title: 'AMC Renewals', icon: ShieldCheck },
@@ -86,7 +88,7 @@ export default function Nav() {
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild
-                isActive={pathname === item.href}
+                isActive={pathname.startsWith(item.href)}
                 tooltip={item.title}
               >
                 <Link href={item.href}>

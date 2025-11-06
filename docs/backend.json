@@ -270,6 +270,19 @@
         "submittedAt": { "type": "string", "format": "date-time", "description": "Timestamp when the request was submitted." }
       },
       "required": ["id", "userId", "userName", "date", "amount", "transactionType", "status", "submittedAt"]
+    },
+    "Account": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Account",
+      "type": "object",
+      "description": "Represents a financial account, such as a customer, bank, or expense account.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the account." },
+        "name": { "type": "string", "description": "The name of the account." },
+        "type": { "type": "string", "enum": ["Customer", "Bank", "Expense"], "description": "The type of the account." },
+        "ownerId": { "type": "string", "description": "The ID of the user who owns this account." }
+      },
+      "required": ["id", "name", "type", "ownerId"]
     }
   },
   "auth": {
@@ -360,6 +373,18 @@
             { "name": "userId", "description": "The unique ID of the user." },
             { "name": "reportId", "description": "The unique ID for the report." }
           ]
+        }
+      },
+      {
+        "path": "/users/{userId}/accounts/{accountId}",
+        "definition": {
+            "entityName": "Account",
+            "schema": { "$ref": "#/backend/entities/Account" },
+            "description": "Stores user-defined financial accounts.",
+            "params": [
+                { "name": "userId", "description": "The unique ID of the user." },
+                { "name": "accountId", "description": "The unique ID for the account." }
+            ]
         }
       },
       {

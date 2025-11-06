@@ -89,3 +89,10 @@ export type AmcDetail = {
     endDate: string;
     description: string;
 };
+
+export type Account = {
+    id: string;
+    name: string;
+    type: 'Customer' | 'Bank' | 'Expense';
+    ownerId?: string;
+};

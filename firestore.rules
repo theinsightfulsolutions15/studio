@@ -95,6 +95,14 @@ service cloud.firestore {
          allow get, create, update, delete: if isOwner(userId) || isAdmin();
          allow list: if isOwner(userId) || isAdmin();
        }
+
+      /**
+       * Rules for nested account records.
+       */
+      match /accounts/{accountId} {
+        allow get, create, update, delete: if isOwner(userId) || isAdmin();
+        allow list: if isOwner(userId) || isAdmin();
+      }
     }
 
     /**
