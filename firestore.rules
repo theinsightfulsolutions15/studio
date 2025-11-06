@@ -106,9 +106,8 @@ service cloud.firestore {
      * Rules for movement records.
      */
     match /movements/{movementId} {
-        allow read: if isSignedIn();
-        // Only active, non-expired users or admins can write to movement records.
-        allow write: if isAccountActive() || isAdmin();
+        // Only active, non-expired users or admins can read or write to movement records.
+        allow read, write: if isAccountActive() || isAdmin();
     }
 
 
