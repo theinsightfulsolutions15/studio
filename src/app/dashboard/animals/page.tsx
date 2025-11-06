@@ -148,6 +148,38 @@ export default function AnimalsPage() {
                   return;
                 }
 
+                // Check for duplicates before committing
+                const existingTagNos = new Set(animals?.map(a => a.govtTagNo));
+                const importTagNos = new Set<string>();
+                let duplicateFoundInFile = false;
+                let duplicateFoundInDB = false;
+                let duplicateTagNo = '';
+
+                for (const row of json) {
+                    const tagNo = String(row['TAG NO']);
+                    if (importTagNos.has(tagNo)) {
+                        duplicateFoundInFile = true;
+                        duplicateTagNo = tagNo;
+                        break;
+                    }
+                    if (existingTagNos.has(tagNo)) {
+                        duplicateFoundInDB = true;
+                        duplicateTagNo = tagNo;
+                        break;
+                    }
+                    importTagNos.add(tagNo);
+                }
+
+                if (duplicateFoundInFile) {
+                    toast({ variant: "destructive", title: "Import Failed", description: `Duplicate Tag No "${duplicateTagNo}" found in the import file.` });
+                    return;
+                }
+                if (duplicateFoundInDB) {
+                    toast({ variant: "destructive", title: "Import Failed", description: `Tag No "${duplicateTagNo}" already exists in the database.` });
+                    return;
+                }
+
+
                 const batch = writeBatch(firestore);
                 const animalsColRef = collection(firestore, 'animals');
 
@@ -201,6 +233,12 @@ export default function AnimalsPage() {
     }
      if (!newAnimal.govtTagNo || !newAnimal.breed) {
         toast({ variant: 'destructive', title: 'Validation Error', description: 'Tag No and Breed are required.' });
+        return;
+    }
+
+    // Check for duplicate govtTagNo
+    if (animals?.some(animal => animal.govtTagNo === newAnimal.govtTagNo)) {
+        toast({ variant: 'destructive', title: 'Registration Failed', description: `An animal with Tag No "${newAnimal.govtTagNo}" already exists.` });
         return;
     }
 
@@ -419,4 +457,3 @@ export default function AnimalsPage() {
     </Card>
   );
 }
-
