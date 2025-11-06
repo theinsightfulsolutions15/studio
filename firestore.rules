@@ -11,7 +11,7 @@
  * - `/users/{userId}`: Stores personal user data. Only the user themselves can read or write their own document.
  * - `/animals/{animalId}`: Stores animal records. These are publicly readable, but only the creating user can modify or delete them.
  *   Each animal document MUST contain a denormalized `ownerId` field that matches the user who created it.
- * - `/animals/{animalId}/movements/{animalMovementId}`: Stores movement history for each animal. Inherits access control from the parent animal document.
+ * - `/movements/{movementId}`: Stores movement history for each animal. Inherits access control from the parent animal document.
  *   The existence of the parent document must be validated before allowing operations on the movement records.
  * - `/financial_records/{financialRecordId}`: Stores financial records. Publicly readable, but write access is restricted to the creating user.
  *   Each financial record MUST contain a denormalized `ownerId` field indicating the creator.
@@ -100,13 +100,17 @@ service cloud.firestore {
       allow read: if isSignedIn();
       // Only active, non-expired users or admins can write to animal records.
       allow write: if isAccountActive() || isAdmin();
-
-        match /movements/{movementId} {
-            allow read: if isSignedIn();
-            // Only active, non-expired users or admins can write to movement records.
-            allow write: if isAccountActive() || isAdmin();
-        }
     }
+    
+    /**
+     * Rules for movement records.
+     */
+    match /movements/{movementId} {
+        allow read: if isSignedIn();
+        // Only active, non-expired users or admins can write to movement records.
+        allow write: if isAccountActive() || isAdmin();
+    }
+
 
     /**
      * Rules for financial records.
@@ -152,3 +156,4 @@ service cloud.firestore {
     }
   }
 }
+

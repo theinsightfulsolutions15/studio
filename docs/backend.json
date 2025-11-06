@@ -313,7 +313,7 @@
         }
       },
       {
-        "path": "/animals/{animalId}/movements/{movementId}",
+        "path": "/movements/{movementId}",
         "definition": {
           "entityName": "AnimalMovement",
           "schema": {
@@ -321,10 +321,6 @@
           },
           "description": "Stores the movement history of each animal. Includes a denormalized 'ownerId' for authorization, indicating which user recorded the movement.",
           "params": [
-            {
-              "name": "animalId",
-              "description": "The unique identifier for the animal."
-            },
             {
               "name": "movementId",
               "description": "The unique identifier for the animal movement record."

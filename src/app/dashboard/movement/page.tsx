@@ -36,7 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal, PlusCircle } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, collectionGroup, query, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState, useMemo } from 'react';
 import type { Animal, AnimalMovement } from '@/lib/types';
@@ -141,7 +141,7 @@ export default function MovementPage() {
 
   const movementsQuery = useMemoFirebase(() => {
       if (!firestore || !user) return null;
-      return query(collectionGroup(firestore, 'movements'));
+      return query(collection(firestore, 'movements'));
   }, [firestore, user]);
 
   const { data: allMovements, isLoading: isLoadingAll } = useCollection<AnimalMovement>(movementsQuery);
@@ -194,13 +194,11 @@ export default function MovementPage() {
     
     try {
         if (dialogMode === 'create') {
-            const movementColRef = collection(firestore, `animals/${formData.animalId}/movements`);
+            const movementColRef = collection(firestore, 'movements');
             await addDocumentNonBlocking(movementColRef, { ...formData, ownerId: user.uid });
             toast({ title: 'Success', description: 'New movement record has been added.' });
         } else if (dialogMode === 'edit' && selectedMovement) {
-            const movementDocRef = doc(firestore, `animals/${selectedMovement.animalId}/movements`, selectedMovement.id);
-            // Note: You can't change the animalId after creation in this data model.
-            // If that's needed, the logic would be to delete and create a new one.
+            const movementDocRef = doc(firestore, 'movements', selectedMovement.id);
             await updateDocumentNonBlocking(movementDocRef, formData);
             toast({ title: 'Success', description: 'Movement record has been updated.' });
         }
