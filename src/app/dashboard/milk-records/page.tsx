@@ -7,7 +7,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter
 } from '@/components/ui/card';
 import {
   Table,
@@ -30,7 +29,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlusCircle, ChevronsUpDown, Check, Trash2, Plus } from 'lucide-react';
+import { PlusCircle, ChevronsUpDown, Check, Trash2, Plus, Droplets } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, writeBatch, doc } from 'firebase/firestore';
 import type { MilkRecord, Animal, AnimalMovement } from '@/lib/types';
@@ -43,6 +42,8 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import { DateRange } from 'react-day-picker';
+import { DatePickerWithRange } from '@/components/date-picker-range';
 
 
 function MilkRecordRowSkeleton() {
@@ -80,6 +81,7 @@ export default function MilkRecordsPage() {
   const [currentSession, setCurrentSession] = useState<'Morning' | 'Evening'>('Morning');
   const [currentAnimal, setCurrentAnimal] = useState<{id: string, tag: string, breed: string} | null>(null);
   const [currentQuantity, setCurrentQuantity] = useState<number | ''>('');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
 
   const animalsQuery = useMemoFirebase(() => {
@@ -130,10 +132,41 @@ export default function MilkRecordsPage() {
         animalStatuses.get(animal.id) === 'in'
     ) || [];
   }, [animals, animalStatuses]);
+
+    const filteredMilkData = useMemo(() => {
+        if (!milkData) return null;
+        if (!dateRange || (!dateRange.from && !dateRange.to)) return milkData;
+
+        return milkData.filter(record => {
+            const recordDate = new Date(record.date);
+            recordDate.setUTCHours(0, 0, 0, 0);
+
+            const from = dateRange.from ? new Date(dateRange.from) : null;
+            if(from) from.setUTCHours(0,0,0,0);
+            
+            const to = dateRange.to ? new Date(dateRange.to) : null;
+            if(to) to.setUTCHours(0,0,0,0);
+
+            if (from && to) {
+                return recordDate >= from && recordDate <= to;
+            }
+            if (from) {
+                return recordDate >= from;
+            }
+            if (to) {
+                return recordDate <= to;
+            }
+            return true;
+        });
+    }, [milkData, dateRange]);
+
+    const totalInRange = useMemo(() => {
+        return filteredMilkData?.reduce((acc, record) => acc + record.quantity, 0) || 0;
+    }, [filteredMilkData]);
   
   const groupedData: GroupedMilkData = useMemo(() => {
-    if (!milkData) return {};
-    return milkData.reduce((acc, record) => {
+    if (!filteredMilkData) return {};
+    return filteredMilkData.reduce((acc, record) => {
         const date = record.date;
         if (!acc[date]) {
             acc[date] = { morning: [], evening: [], total: 0 };
@@ -146,7 +179,7 @@ export default function MilkRecordsPage() {
         acc[date].total += record.quantity;
         return acc;
     }, {} as GroupedMilkData);
-  }, [milkData]);
+  }, [filteredMilkData]);
 
   const sortedDates = useMemo(() => Object.keys(groupedData).sort((a,b) => new Date(b).getTime() - new Date(a).getTime()), [groupedData]);
 
@@ -206,7 +239,6 @@ export default function MilkRecordsPage() {
             const { animalBreed, ...restOfRecord } = record;
             batch.set(docRef, {
                 ...restOfRecord,
-                animalBreed: animalBreed,
                 date: dateToSave,
                 time: currentSession,
                 ownerId: user.uid,
@@ -236,96 +268,122 @@ export default function MilkRecordsPage() {
 
   return (
     <>
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-4">
-            <div>
-                <CardTitle>Milk Records</CardTitle>
-                <CardDescription>Log and monitor daily milk production.</CardDescription>
-            </div>
-            <Button onClick={openDialog}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Records
-            </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-          {isLoading && (
-              <div className="space-y-4">
-                {Array.from({length: 3}).map((_,i) => <Skeleton key={i} className="h-12 w-full" />)}
-              </div>
-          )}
-          {!isLoading && sortedDates.length === 0 && (
-             <div className="text-center py-10 text-muted-foreground">No milk records found.</div>
-          )}
-          <Accordion type="single" collapsible className="w-full space-y-2">
-            {sortedDates.map(date => (
-                <AccordionItem value={date} key={date} className="border rounded-md px-4 bg-muted/20">
-                    <AccordionTrigger className="hover:no-underline py-3">
-                        <div className="flex items-center justify-between w-full">
-                            <span className="font-semibold text-lg">{new Date(date).toLocaleDateString(undefined, { timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                            <Badge variant="secondary" className="text-base">Total: {groupedData[date].total.toFixed(2)} L</Badge>
-                        </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-4 pt-2">
-                       {groupedData[date].morning.length > 0 && (
-                           <div>
-                               <div className="flex justify-between items-center mb-2">
-                                    <h3 className="font-semibold text-md">Morning Session</h3>
-                                     <Badge variant="outline">Total: {groupedData[date].morning.reduce((acc, r) => acc + r.quantity, 0).toFixed(2)} L</Badge>
-                               </div>
-                                <div className="border rounded-md">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Animal Tag</TableHead>
-                                            <TableHead className="text-right">Quantity (L)</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {groupedData[date].morning.map(r => (
-                                            <TableRow key={r.id}>
-                                                <TableCell className="font-medium">{r.animalTag}</TableCell>
-                                                <TableCell className="text-right">{r.quantity.toFixed(2)}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+    <div className="space-y-6">
+        <Card>
+            <CardHeader>
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div>
+                        <CardTitle>Milk Records</CardTitle>
+                        <CardDescription>Log and monitor daily milk production.</CardDescription>
+                    </div>
+                     <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+                        <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+                        <Button onClick={openDialog} className="w-full sm:w-auto">
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add Records
+                        </Button>
+                    </div>
+                </div>
+            </CardHeader>
+            {dateRange && (dateRange.from || dateRange.to) && (
+                 <CardContent>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Total Milk in Range</CardTitle>
+                            <Droplets className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{totalInRange.toFixed(2)} L</div>
+                            <p className="text-xs text-muted-foreground">
+                                From {dateRange.from ? format(dateRange.from, 'LLL dd, y') : 'start'} to {dateRange.to ? format(dateRange.to, 'LLL dd, y') : 'end'}
+                            </p>
+                        </CardContent>
+                    </Card>
+                </CardContent>
+            )}
+        </Card>
+
+        <Card>
+            <CardContent className="pt-6">
+                {isLoading && (
+                    <div className="space-y-4">
+                        {Array.from({length: 3}).map((_,i) => <Skeleton key={i} className="h-12 w-full" />)}
+                    </div>
+                )}
+                {!isLoading && sortedDates.length === 0 && (
+                    <div className="text-center py-10 text-muted-foreground">
+                        {dateRange ? 'No milk records found for the selected date range.' : 'No milk records found.'}
+                    </div>
+                )}
+                <Accordion type="single" collapsible className="w-full space-y-2">
+                    {sortedDates.map(date => (
+                        <AccordionItem value={date} key={date} className="border rounded-md px-4 bg-muted/20">
+                            <AccordionTrigger className="hover:no-underline py-3">
+                                <div className="flex items-center justify-between w-full">
+                                    <span className="font-semibold text-lg">{new Date(date).toLocaleDateString(undefined, { timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                    <Badge variant="secondary" className="text-base">Total: {groupedData[date].total.toFixed(2)} L</Badge>
                                 </div>
-                           </div>
-                       )}
-                        {groupedData[date].evening.length > 0 && (
-                           <div>
-                                <div className="flex justify-between items-center mb-2">
-                                    <h3 className="font-semibold text-md">Evening Session</h3>
-                                     <Badge variant="outline">Total: {groupedData[date].evening.reduce((acc, r) => acc + r.quantity, 0).toFixed(2)} L</Badge>
-                               </div>
-                                <div className="border rounded-md">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Animal Tag</TableHead>
-                                            <TableHead className="text-right">Quantity (L)</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {groupedData[date].evening.map(r => (
-                                            <TableRow key={r.id}>
-                                                <TableCell className="font-medium">{r.animalTag}</TableCell>
-                                                <TableCell className="text-right">{r.quantity.toFixed(2)}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                            </AccordionTrigger>
+                            <AccordionContent className="space-y-4 pt-2">
+                            {groupedData[date].morning.length > 0 && (
+                                <div>
+                                    <div className="flex justify-between items-center mb-2">
+                                            <h3 className="font-semibold text-md">Morning Session</h3>
+                                            <Badge variant="outline">Total: {groupedData[date].morning.reduce((acc, r) => acc + r.quantity, 0).toFixed(2)} L</Badge>
                                 </div>
-                           </div>
-                       )}
-                    </AccordionContent>
-                </AccordionItem>
-            ))}
-          </Accordion>
-      </CardContent>
-    </Card>
+                                    <div className="border rounded-md">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Animal Tag</TableHead>
+                                                <TableHead className="text-right">Quantity (L)</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {groupedData[date].morning.map(r => (
+                                                <TableRow key={r.id}>
+                                                    <TableCell className="font-medium">{r.animalTag}</TableCell>
+                                                    <TableCell className="text-right">{r.quantity.toFixed(2)}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                    </div>
+                                </div>
+                            )}
+                                {groupedData[date].evening.length > 0 && (
+                                <div>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <h3 className="font-semibold text-md">Evening Session</h3>
+                                            <Badge variant="outline">Total: {groupedData[date].evening.reduce((acc, r) => acc + r.quantity, 0).toFixed(2)} L</Badge>
+                                </div>
+                                    <div className="border rounded-md">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Animal Tag</TableHead>
+                                                <TableHead className="text-right">Quantity (L)</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {groupedData[date].evening.map(r => (
+                                                <TableRow key={r.id}>
+                                                    <TableCell className="font-medium">{r.animalTag}</TableCell>
+                                                    <TableCell className="text-right">{r.quantity.toFixed(2)}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                    </div>
+                                </div>
+                            )}
+                            </AccordionContent>
+                        </AccordionItem>
+                    ))}
+                </Accordion>
+            </CardContent>
+        </Card>
+    </div>
 
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-4xl">
@@ -340,7 +398,7 @@ export default function MilkRecordsPage() {
                 <div className="grid grid-cols-2 gap-4 border-b pb-4">
                      <div className="space-y-2">
                         <Label htmlFor="date">Date</Label>
-                        <DatePicker date={currentDate} setDate={setCurrentDate} />
+                        <DatePicker date={currentDate} setDate={(d) => d && setCurrentDate(new Date(d.getTime() - d.getTimezoneOffset() * -60000))}/>
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="time">Milking Time</Label>
@@ -473,5 +531,3 @@ export default function MilkRecordsPage() {
     </>
   );
 }
-
-    
