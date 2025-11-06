@@ -441,6 +441,17 @@
             }
           ]
         }
+      },
+      {
+        "path": "/admin_notifications/{notificationId}",
+        "definition": {
+            "entityName": "AppNotification",
+            "schema": { "$ref": "#/backend/entities/AppNotification" },
+            "description": "Stores global notifications for all admin users.",
+            "params": [
+                { "name": "notificationId", "description": "The unique ID for the admin notification." }
+            ]
+        }
       }
     ],
     "reasoning": "The Firestore data structure is designed to support the GauRakshak application by adopting a user-centric model where each user's data (animals, movements, financials, etc.) is nested within their own document. This enhances data privacy and simplifies security rules by leveraging path-based ownership. Top-level collections like 'amc_renewals' and 'roles_admin' are maintained for global operations and administrative functions. This structure ensures that users can only access their own data, while admins have broader permissions, creating a secure and scalable architecture."

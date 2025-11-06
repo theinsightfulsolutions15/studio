@@ -107,8 +107,9 @@ service cloud.firestore {
       match /notifications/{notificationId} {
         // Users can read, update (to mark as read), and delete their own notifications.
         allow read, update, delete: if isOwner(userId);
-        // A user can list their own notifications. Admins can create them.
+        // A user can list their own notifications.
         allow list: if isOwner(userId);
+        // Admins can create notifications for users.
         allow create: if isAdmin();
       }
     }
@@ -131,6 +132,14 @@ service cloud.firestore {
       allow get, write: if isAdmin();
       // Nobody can list all admin roles for security.
       allow list, delete: if false;
+    }
+
+     /**
+     * Rules for global admin notifications.
+     */
+    match /admin_notifications/{notificationId} {
+      // Only admins can read, create, or delete notifications.
+      allow read, write, delete, list: if isAdmin();
     }
   }
 }

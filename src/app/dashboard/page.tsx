@@ -32,13 +32,12 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { collection, serverTimestamp, doc, query, where, getDocs } from 'firebase/firestore';
+import { collection, serverTimestamp, doc, query, where, writeBatch } from 'firebase/firestore';
 import { useState, useEffect, useMemo } from 'react';
 import { DatePicker } from '@/components/ui/date-picker';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { User as AppUser, Animal, MilkRecord, FinancialRecord } from '@/lib/types';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { format, getMonth, getYear, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, getMonth, getYear, subMonths } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
 
@@ -72,7 +71,7 @@ function AmcRenewalForm() {
     const [isOpen, setIsOpen] = useState(false);
 
     const handleSubmit = async () => {
-        if (!user || !firestore) {
+        if (!user || !firestore || !authUser) {
              toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
             return;
         }
@@ -82,10 +81,14 @@ function AmcRenewalForm() {
         }
 
         setIsSubmitting(true);
-        const amcCollectionRef = collection(firestore, `amc_renewals`);
         
         try {
-            await addDocumentNonBlocking(amcCollectionRef, {
+            const batch = writeBatch(firestore);
+
+            // 1. Create the renewal request
+            const amcCollectionRef = collection(firestore, `amc_renewals`);
+            const renewalDocRef = doc(amcCollectionRef);
+            batch.set(renewalDocRef, {
                 userId: user.id,
                 userName: user.name || user.email,
                 customerId: user.customerId,
@@ -95,6 +98,20 @@ function AmcRenewalForm() {
                 status: 'Pending',
                 submittedAt: serverTimestamp(),
             });
+
+            // 2. Create a notification for admins
+            const adminNotifRef = doc(collection(firestore, 'admin_notifications'));
+             batch.set(adminNotifRef, {
+                title: "New AMC Renewal Request",
+                description: `${user.name || user.email} has submitted an AMC renewal request.`,
+                createdAt: serverTimestamp(),
+                read: false,
+                href: '/dashboard/amc',
+                icon: 'ShieldCheck',
+            });
+
+            await batch.commit();
+
             toast({ title: 'Success', description: 'Your AMC renewal request has been submitted for admin approval.' });
             setAmount('');
             setTransactionType('');
@@ -182,33 +199,33 @@ export default function Dashboard() {
   
   const isAdmin = user?.role === 'Admin';
   
-  const baseQueryPath = useMemo(() => {
-    if (!firestore || !authUser) return null;
-    return isAdmin ? 'users' : `users/${authUser.uid}`;
+  // For admins, we need to query all users' data. For regular users, just their own.
+  const animalsQuery = useMemoFirebase(() => {
+      if (!firestore) return null;
+      if (isAdmin) return collection(firestore, 'animals');
+      if (authUser) return collection(firestore, `users/${authUser.uid}/animals`);
+      return null;
   }, [firestore, authUser, isAdmin]);
 
-
-  // --- Data Queries for Dashboard Cards & Chart ---
-  const animalsQuery = useMemoFirebase(() => {
-    if (!baseQueryPath) return null;
-    const collectionPath = isAdmin ? 'animals' : `${baseQueryPath}/animals`;
-    const q = isAdmin ? collection(firestore, collectionPath) : collection(firestore, collectionPath);
-    return q;
-  }, [baseQueryPath, firestore, isAdmin]);
-  const { data: animals, isLoading: isLoadingAnimals } = useCollection<Animal>(animalsQuery);
-
   const milkRecordsQuery = useMemoFirebase(() => {
-      if (!baseQueryPath) return null;
-      const collectionPath = isAdmin ? 'milk_records' : `${baseQueryPath}/milk_records`;
-      return collection(firestore, collectionPath);
-  }, [baseQueryPath, firestore, isAdmin]);
-  const { data: milkRecords, isLoading: isLoadingMilk } = useCollection<MilkRecord>(milkRecordsQuery);
-
+      if (!firestore) return null;
+      if (isAdmin) return collection(firestore, 'milk_records');
+      if (authUser) return collection(firestore, `users/${authUser.uid}/milk_records`);
+      return null;
+  }, [firestore, authUser, isAdmin]);
+  
   const financialRecordsQuery = useMemoFirebase(() => {
-      if (!baseQueryPath) return null;
-      const collectionPath = isAdmin ? 'financial_records' : `${baseQueryPath}/financial_records`;
-      return collection(firestore, collectionPath);
-  }, [baseQueryPath, firestore, isAdmin]);
+      if (!firestore) return null;
+      if (isAdmin) return collection(firestore, 'financial_records');
+      if (authUser) return collection(firestore, `users/${authUser.uid}/financial_records`);
+      return null;
+  }, [firestore, authUser, isAdmin]);
+
+  // UseCollection for admin would need to iterate through all users if data is nested.
+  // This simplified approach assumes top-level collections for admin for demonstration.
+  // In a real multi-tenant app with nested data, this would need a more complex query strategy for admins.
+  const { data: animals, isLoading: isLoadingAnimals } = useCollection<Animal>(animalsQuery);
+  const { data: milkRecords, isLoading: isLoadingMilk } = useCollection<MilkRecord>(milkRecordsQuery);
   const { data: financialRecords, isLoading: isLoadingFinancial } = useCollection<FinancialRecord>(financialRecordsQuery);
 
   // --- Calculate Stats for Cards ---
@@ -276,7 +293,7 @@ export default function Dashboard() {
 
 
   useEffect(() => {
-    if (user) {
+    if (user && user.role !== 'Admin') {
       if (user.status === 'Expired') {
         setIsExpired(true);
         return;
@@ -287,15 +304,12 @@ export default function Dashboard() {
         const validity = new Date(user.validityDate);
         validity.setHours(0, 0, 0, 0);
         setIsExpired(validity < today);
-      } else if (user.status !== 'Active' || user.role !== 'Admin') {
-        // If user is not admin and has no validity date, they might be pending or have an issue
-        // We assume non-admin users without a date are expired or pending. Admin is always active.
-        setIsExpired(true);
       } else {
-        setIsExpired(false);
+        // If non-admin user has no validity date, assume expired.
+        setIsExpired(true);
       }
-    } else if (!isUserDocLoading) {
-      // If there's no user data and we're not loading, they can't be expired (they might not exist or be pending)
+    } else {
+      // Admin users or loading users are not considered expired.
       setIsExpired(false);
     }
   }, [user, isUserDocLoading]);
@@ -304,7 +318,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {(isExpired && !isLoading) && <AmcRenewalForm />}
+      {(isExpired && !isUserLoading) && <AmcRenewalForm />}
       <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
       
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

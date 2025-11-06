@@ -23,7 +23,7 @@ import { useRouter } from 'next/navigation';
 import { Bell, UserCheck, ShieldCheck, Activity, CheckCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { doc, collection, query, where, writeBatch, orderBy } from 'firebase/firestore';
-import type { User as AppUser, AmcRenewal, Animal, AppNotification } from '@/lib/types';
+import type { User as AppUser, Animal, AppNotification } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 
 function DateTimeDisplay() {
@@ -79,15 +79,11 @@ export default function Header() {
   const isAdmin = userData?.role === 'Admin';
 
   // --- Admin Specific Notifications ---
-  const pendingUsersQuery = useMemoFirebase(() => (
-    isAdmin && firestore ? query(collection(firestore, 'users'), where('status', '==', 'Pending')) : null
+   const adminNotificationsQuery = useMemoFirebase(() => (
+    isAdmin && firestore ? query(collection(firestore, 'admin_notifications'), where('read', '==', false), orderBy('createdAt', 'desc')) : null
   ), [isAdmin, firestore]);
-  const { data: pendingUsers } = useCollection<AppUser>(pendingUsersQuery);
+  const { data: adminNotifications } = useCollection<AppNotification>(adminNotificationsQuery);
 
-  const pendingRenewalsQuery = useMemoFirebase(() => (
-      isAdmin && firestore ? query(collection(firestore, 'amc_renewals'), where('status', '==', 'Pending')) : null
-  ), [isAdmin, firestore]);
-  const { data: pendingRenewals } = useCollection<AmcRenewal>(pendingRenewalsQuery);
 
   // --- User Specific Notifications ---
   const sickAnimalsQuery = useMemoFirebase(() => (
@@ -100,7 +96,7 @@ export default function Header() {
   ), [user, firestore]);
   const { data: userNotifications } = useCollection<AppNotification>(userNotificationsQuery);
 
-  const adminNotificationsCount = (pendingUsers?.length ?? 0) + (pendingRenewals?.length ?? 0);
+  const adminNotificationsCount = adminNotifications?.length ?? 0;
   const userSpecificNotificationsCount = (sickAnimals?.length ?? 0) + (userNotifications?.length ?? 0);
 
   const totalNotificationsCount = isAdmin ? adminNotificationsCount + userSpecificNotificationsCount : userSpecificNotificationsCount;
@@ -114,12 +110,23 @@ export default function Header() {
   };
 
   const markAllAsRead = async () => {
-    if (!firestore || !user || !userNotifications || userNotifications.length === 0) return;
+    if (!firestore || !user) return;
     const batch = writeBatch(firestore);
-    userNotifications.forEach(notif => {
-        const notifRef = doc(firestore, `users/${user.uid}/notifications`, notif.id);
-        batch.update(notifRef, { read: true });
-    });
+
+    if (isAdmin && adminNotifications) {
+        adminNotifications.forEach(notif => {
+            const notifRef = doc(firestore, 'admin_notifications', notif.id);
+            batch.update(notifRef, { read: true });
+        });
+    }
+    
+    if (userNotifications) {
+        userNotifications.forEach(notif => {
+            const notifRef = doc(firestore, `users/${user.uid}/notifications`, notif.id);
+            batch.update(notifRef, { read: true });
+        });
+    }
+
     await batch.commit();
   };
 
@@ -135,6 +142,19 @@ export default function Header() {
         default: return <Bell className="h-4 w-4 text-gray-500" />;
     }
   };
+  
+  const allUserNotifications = [
+      ...(userNotifications || []),
+      ...(sickAnimals?.map(a => ({
+          id: `sick-${a.id}`,
+          title: "Animal Health Alert",
+          description: `Animal ${a.govtTagNo} is ${a.healthStatus}.`,
+          createdAt: new Date(), // This won't be accurate, but it's for display
+          href: '/dashboard/master/animals',
+          icon: 'Activity' as const,
+          read: false,
+      })) || [])
+  ];
 
   return (
     <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-4 border-b bg-card px-4 md:px-6">
@@ -158,7 +178,7 @@ export default function Header() {
           <DropdownMenuContent align="end" className="w-[350px]">
             <DropdownMenuLabel className="flex justify-between items-center">
               <span>Notifications</span>
-               {(userNotifications && userNotifications.length > 0) && (
+               {(totalNotificationsCount > 0) && (
                 <Button variant="link" size="sm" className="h-auto p-0" onClick={markAllAsRead}>Mark all as read</Button>
               )}
             </DropdownMenuLabel>
@@ -169,7 +189,7 @@ export default function Header() {
                 </div>
             ) : (
                 <>
-                {userNotifications?.map(n => (
+                {allUserNotifications?.map(n => (
                      <DropdownMenuItem key={n.id} asChild>
                         <Link href={n.href || '#'} className="flex flex-col items-start gap-1">
                             <div className="flex items-center gap-2">
@@ -180,17 +200,6 @@ export default function Header() {
                         </Link>
                     </DropdownMenuItem>
                 ))}
-                {sickAnimals?.map(a => (
-                     <DropdownMenuItem key={a.id} asChild>
-                        <Link href="/dashboard/master/animals" className="flex flex-col items-start gap-1">
-                            <div className="flex items-center gap-2">
-                                <Activity className="h-4 w-4 text-red-500" />
-                                <p className="font-medium">Animal Health Alert</p>
-                            </div>
-                            <p className="pl-6 text-xs text-muted-foreground">Animal {a.govtTagNo} is {a.healthStatus}.</p>
-                        </Link>
-                    </DropdownMenuItem>
-                ))}
                  {isAdmin && (adminNotificationsCount > 0) && (
                     <DropdownMenuSub>
                         <DropdownMenuSubTrigger>
@@ -198,25 +207,14 @@ export default function Header() {
                             Admin Actions ({adminNotificationsCount})
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent className="p-0">
-                             {pendingUsers?.map(u => (
-                                <DropdownMenuItem key={u.id} asChild>
-                                    <Link href="/dashboard/user-approvals" className="flex flex-col items-start gap-1">
+                             {adminNotifications?.map(n => (
+                                <DropdownMenuItem key={n.id} asChild>
+                                    <Link href={n.href || '#'} className="flex flex-col items-start gap-1">
                                         <div className="flex items-center gap-2">
-                                            <UserCheck className="h-4 w-4 text-blue-500" />
-                                            <p className="font-medium">New User Pending Approval</p>
+                                            {getIcon(n.icon)}
+                                            <p className="font-medium">{n.title}</p>
                                         </div>
-                                        <p className="pl-6 text-xs text-muted-foreground">{u.name} is waiting for approval.</p>
-                                    </Link>
-                                </DropdownMenuItem>
-                            ))}
-                            {pendingRenewals?.map(r => (
-                                <DropdownMenuItem key={r.id} asChild>
-                                    <Link href="/dashboard/amc" className="flex flex-col items-start gap-1">
-                                    <div className="flex items-center gap-2">
-                                            <ShieldCheck className="h-4 w-4 text-green-500" />
-                                            <p className="font-medium">New AMC Renewal Request</p>
-                                        </div>
-                                        <p className="pl-6 text-xs text-muted-foreground">{r.userName} submitted a renewal request.</p>
+                                        <p className="pl-6 text-xs text-muted-foreground">{n.description}</p>
                                     </Link>
                                 </DropdownMenuItem>
                             ))}
