@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -67,7 +68,7 @@ export default function Nav() {
 
   const isAdmin = currentUser?.role === 'Admin';
 
-  const navItems = isAdmin ? [...baseNavItems, ...masterNavItems, ...adminNavItems] : [...baseNavItems, { href: '/dashboard/master/animals', title: 'Animals', icon: Beef }];
+  const navItems = isAdmin ? [...baseNavItems, ...masterNavItems, ...adminNavItems] : [...baseNavItems, ...masterNavItems];
 
 
   return (
