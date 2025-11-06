@@ -20,9 +20,9 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { ChevronsUpDown, Check, FileDown } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
-import type { FinancialRecord, Account } from '@/lib/types';
+import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
+import { collection, query, where, doc } from 'firebase/firestore';
+import type { FinancialRecord, Account, User as AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useMemo } from 'react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -62,6 +62,12 @@ export default function LedgerPage() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  
+  const userDocRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: userData, isLoading: isLoadingUser } = useDoc<AppUser>(userDocRef);
 
   // Query for all accounts
   const accountsQuery = useCollection<Account>(
@@ -162,7 +168,7 @@ export default function LedgerPage() {
 
   }, [financialRecords, selectedAccountId, dateRange]);
 
-  const isLoading = isLoadingAccounts || isLoadingRecords;
+  const isLoading = isLoadingAccounts || isLoadingRecords || isLoadingUser;
 
   const handleDownloadPdf = () => {
     if (!selectedAccountId) {
@@ -175,16 +181,39 @@ export default function LedgerPage() {
     }
     
     const doc = new jsPDF();
+    const pageHeight = doc.internal.pageSize.height || doc.internal.pageSize.getHeight();
+    const pageWidth = doc.internal.pageSize.width || doc.internal.pageSize.getWidth();
+    let currentY = 15;
+
+    // User Profile Header
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(userData?.name || 'Gaushala', pageWidth / 2, currentY, { align: 'center' });
+    currentY += 7;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    if (userData?.address) {
+      doc.text(userData.address, pageWidth / 2, currentY, { align: 'center' });
+      currentY += 5;
+    }
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, currentY, pageWidth - 14, currentY);
+    currentY += 10;
     
+    // Ledger Title
     const title = `Ledger for: ${selectedAccountName}`;
     const dateStr = dateRange?.from
       ? `From: ${format(dateRange.from, 'dd/MM/yyyy')} ${dateRange.to ? `To: ${format(dateRange.to, 'dd/MM/yyyy')}` : ''}`
       : 'All Dates';
 
-    doc.setFontSize(18);
-    doc.text(title, 14, 22);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title, 14, currentY);
+    currentY += 7;
     doc.setFontSize(11);
-    doc.text(dateStr, 14, 30);
+    doc.setFont('helvetica', 'normal');
+    doc.text(dateStr, 14, currentY);
+    currentY += 4;
     
     const tableData = transactions.map(tx => [
       tx.date,
@@ -203,7 +232,7 @@ export default function LedgerPage() {
     ]);
 
     doc.autoTable({
-      startY: 36,
+      startY: currentY,
       head: [['Date', 'Description', 'Debit (₹)', 'Credit (₹)', 'Balance (₹)']],
       body: tableData,
       theme: 'grid',
@@ -219,7 +248,10 @@ export default function LedgerPage() {
         if(data.section === 'foot' && data.column.index > 1) {
             data.cell.styles.halign = 'right';
         }
-      }
+      },
+      didDrawPage: (data) => {
+        // Remove default footer
+      },
     });
     
     doc.save(`Ledger_${selectedAccountName.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);

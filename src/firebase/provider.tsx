@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
@@ -156,11 +157,18 @@ export const useFirebaseApp = (): FirebaseApp => {
 
 type MemoFirebase <T> = T & {__memo?: boolean};
 
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
+export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T {
   const memoized = useMemo(factory, deps);
   
   if(typeof memoized !== 'object' || memoized === null) return memoized;
-  (memoized as MemoFirebase<T>).__memo = true;
+
+  // This property is not strictly needed for memoization but can be useful for debugging
+  // to identify if an object is the result of useMemoFirebase.
+  Object.defineProperty(memoized, '__memo', {
+      value: true,
+      writable: false,
+      enumerable: false,
+  });
   
   return memoized;
 }
