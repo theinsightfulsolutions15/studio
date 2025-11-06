@@ -30,13 +30,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  ...(process.env.NODE_ENV === 'development' && {
-    experimental: {
-      // This is needed to allow the Next.js dev server to accept requests from any origin.
-      // This is required for the app to work in a cloud-based development environment.
-      allowedDevOrigins: ['*'],
-    },
-  }),
 };
 
 export default nextConfig;
