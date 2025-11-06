@@ -27,13 +27,13 @@ import {
 } from 'lucide-react';
 import { monthlyChartData } from '@/lib/placeholder-data';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { collection, serverTimestamp, doc } from 'firebase/firestore';
 import { useState, useEffect } from 'react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -52,9 +52,17 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 function AmcRenewalForm() {
-    const { user, isUserLoading } = useUser() as { user: (AppUser & { uid: string }) | null, isUserLoading: boolean };
+    const { user: authUser, isUserLoading } = useUser();
     const firestore = useFirestore();
     const { toast } = useToast();
+    
+    const userDocRef = useMemoFirebase(() => {
+        if (!authUser) return null;
+        return doc(firestore, 'users', authUser.uid);
+    }, [authUser, firestore]);
+
+    const { data: user } = useDoc<AppUser>(userDocRef);
+
     const [amount, setAmount] = useState<number | ''>('');
     const [transactionType, setTransactionType] = useState<string>('');
     const [transactionDate, setTransactionDate] = useState<Date | undefined>(new Date());
@@ -75,7 +83,7 @@ function AmcRenewalForm() {
         
         try {
             await addDocumentNonBlocking(amcCollectionRef, {
-                userId: user.uid,
+                userId: user.id,
                 userName: user.name || user.email,
                 customerId: user.customerId,
                 amount,
@@ -148,26 +156,42 @@ function AmcRenewalForm() {
 }
 
 export default function Dashboard() {
-  const { user, isUserLoading } = useUser() as { user: (AppUser & { uid: string }) | null, isUserLoading: boolean };
+  const { user: authUser, isUserLoading } = useUser();
+  const firestore = useFirestore();
   const [isExpired, setIsExpired] = useState(false);
+  
+  const userDocRef = useMemoFirebase(() => {
+    if (!authUser) return null;
+    return doc(firestore, 'users', authUser.uid);
+  }, [authUser, firestore]);
+
+  const { data: user, isLoading: isUserDocLoading } = useDoc<AppUser>(userDocRef);
 
   useEffect(() => {
-    if (user && user.validityDate) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Compare dates only, not time
-      const validity = new Date(user.validityDate);
-      setIsExpired(validity < today);
-    } else if (user && user.status === 'Expired') {
+    if (user) {
+      if (user.status === 'Expired') {
         setIsExpired(true);
-    } else {
+        return;
+      }
+      if (user.validityDate) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Compare dates only, not time
+        const validity = new Date(user.validityDate);
+        validity.setHours(0, 0, 0, 0);
+        setIsExpired(validity < today);
+      } else {
         setIsExpired(false);
+      }
+    } else {
+      setIsExpired(false);
     }
   }, [user]);
 
+  const isLoading = isUserLoading || isUserDocLoading;
 
   return (
     <div className="space-y-6">
-      {(isExpired && !isUserLoading) && <AmcRenewalForm />}
+      {(isExpired && !isLoading) && <AmcRenewalForm />}
       <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
       
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
