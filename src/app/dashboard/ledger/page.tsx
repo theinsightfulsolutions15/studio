@@ -28,6 +28,8 @@ import { useState, useMemo } from 'react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import { DatePickerWithRange } from '@/components/date-picker-range';
+import type { DateRange } from 'react-day-picker';
 
 
 function LedgerRowSkeleton() {
@@ -48,6 +50,7 @@ export default function LedgerPage() {
   
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
   // Query for all accounts
   const accountsQuery = useCollection<Account>(
@@ -83,18 +86,51 @@ export default function LedgerPage() {
       return { transactions: [], openingBalance: 0, closingBalance: 0 };
     }
     
-    // For 'cash-customer', we only consider records with category 'Milk Sale' and type 'Receipt'
-     const filteredRecords = financialRecords.filter(record => {
+    const filteredByAccount = financialRecords.filter(record => {
         if (selectedAccountId === 'cash-customer') {
             return record.category === 'Milk Sale' && record.recordType === 'Receipt'
         }
         return record.accountId === selectedAccountId;
     });
 
-    const sortedTransactions = filteredRecords.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sortedTransactions = filteredByAccount.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
     let currentBalance = 0;
-    const transactionsWithBalance = sortedTransactions.map(tx => {
+    const startDate = dateRange?.from ? new Date(dateRange.from) : null;
+    if (startDate) startDate.setHours(0,0,0,0);
+
+    const openingBal = sortedTransactions.reduce((acc, tx) => {
+        const txDate = new Date(tx.date);
+        txDate.setHours(0,0,0,0);
+
+        if (startDate && txDate >= startDate) {
+            return acc;
+        }
+
+        const isReceipt = tx.recordType === 'Receipt';
+        const credit = isReceipt ? tx.amount : 0;
+        const debit = !isReceipt ? tx.amount : 0;
+        return acc + credit - debit;
+    }, 0);
+
+    const transactionsInRange = sortedTransactions.filter(tx => {
+        const txDate = new Date(tx.date);
+        txDate.setHours(0,0,0,0);
+        
+        const from = dateRange?.from ? new Date(dateRange.from) : null;
+        if(from) from.setHours(0,0,0,0);
+
+        const to = dateRange?.to ? new Date(dateRange.to) : null;
+        if(to) to.setHours(0,0,0,0);
+
+        if (from && to) return txDate >= from && txDate <= to;
+        if (from) return txDate >= from;
+        if (to) return txDate <= to;
+        return true; // No date range specified, include all
+    });
+    
+    currentBalance = openingBal;
+    const transactionsWithBalance = transactionsInRange.map(tx => {
       const isReceipt = tx.recordType === 'Receipt';
       const credit = isReceipt ? tx.amount : 0;
       const debit = !isReceipt ? tx.amount : 0;
@@ -109,11 +145,11 @@ export default function LedgerPage() {
 
     return { 
         transactions: transactionsWithBalance, 
-        openingBalance: 0, // Simplified for now
+        openingBalance: openingBal, 
         closingBalance: currentBalance 
     };
 
-  }, [financialRecords, selectedAccountId]);
+  }, [financialRecords, selectedAccountId, dateRange]);
 
   const isLoading = isLoadingAccounts || isLoadingRecords;
 
@@ -126,10 +162,10 @@ export default function LedgerPage() {
               <CardTitle>Account Ledger</CardTitle>
               <CardDescription>View the detailed transaction history for any account.</CardDescription>
             </div>
-            <div className="w-full md:w-auto md:min-w-[300px]">
+            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" role="combobox" className="w-full justify-between">
+                        <Button variant="outline" role="combobox" className="w-full md:w-[300px] justify-between">
                             {selectedAccountName}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
@@ -156,6 +192,7 @@ export default function LedgerPage() {
                         </Command>
                     </PopoverContent>
                 </Popover>
+                <DatePickerWithRange date={dateRange} setDate={setDateRange} />
             </div>
           </div>
         </CardHeader>
@@ -184,11 +221,20 @@ export default function LedgerPage() {
               {selectedAccountId && !isLoading && transactions.length === 0 && (
                  <TableRow>
                     <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
-                        No transactions found for this account.
+                        No transactions found for this account in the selected date range.
                     </TableCell>
                 </TableRow>
               )}
               
+              {transactions.length > 0 && (
+                <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell colSpan={4}>Opening Balance</TableCell>
+                    <TableCell className={cn("text-right", openingBalance < 0 ? "text-destructive" : "")}>
+                        {openingBalance.toFixed(2)}
+                    </TableCell>
+                </TableRow>
+              )}
+
               {transactions.map((tx) => (
                 <TableRow key={tx.id}>
                   <TableCell>{tx.date}</TableCell>
@@ -217,5 +263,3 @@ export default function LedgerPage() {
     </>
   );
 }
-
-
