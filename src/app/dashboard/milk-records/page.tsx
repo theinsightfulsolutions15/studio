@@ -412,10 +412,6 @@ export default function MilkRecordsPage() {
             const financialColRef = collection(firestore, `users/${user.uid}/financial_records`);
             await addDocumentNonBlocking(financialColRef, dataToSave);
             toast({ title: 'Success', description: 'Milk sale recorded successfully.'});
-            generateSalePdf({
-                ...dataToSave,
-                id: '',
-            });
         }
         
         setIsSalesDialogOpen(false);
@@ -489,8 +485,14 @@ export default function MilkRecordsPage() {
             date: new Date(sale.date).toISOString()
         });
     } else {
+        const sortedSales = milkSalesData
+            ?.filter(s => s.invoiceNo && !isNaN(parseInt(s.invoiceNo)))
+            .sort((a, b) => parseInt(b.invoiceNo!) - parseInt(a.invoiceNo!));
+        const lastInvoiceNo = sortedSales?.[0]?.invoiceNo;
+        const nextInvoiceNo = lastInvoiceNo ? (parseInt(lastInvoiceNo) + 1).toString() : '1';
+
         setEditSaleRecord(null);
-        setMilkSaleData(initialMilkSaleState);
+        setMilkSaleData({...initialMilkSaleState, invoiceNo: nextInvoiceNo});
     }
     setIsSalesDialogOpen(true);
   };
@@ -772,7 +774,7 @@ export default function MilkRecordsPage() {
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="invoice-no">Invoice No.</Label>
-                        <Input id="invoice-no" placeholder="e.g. 001" value={milkSaleData.invoiceNo || ''} onChange={(e) => setMilkSaleData(prev => ({...prev, invoiceNo: e.target.value}))} />
+                        <Input id="invoice-no" placeholder="e.g. 1" value={milkSaleData.invoiceNo || ''} onChange={(e) => setMilkSaleData(prev => ({...prev, invoiceNo: e.target.value}))} />
                     </div>
                 </div>
 
@@ -877,4 +879,5 @@ export default function MilkRecordsPage() {
   );
 }
 
+    
     
