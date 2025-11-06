@@ -112,7 +112,7 @@ export default function MilkRecordsPage() {
         const recordsColRef = collection(firestore, `users/${user.uid}/milk_records`);
         await addDocumentNonBlocking(recordsColRef, { ...formData, ownerId: user.uid });
         toast({ title: 'Success', description: 'New milk record has been added.' });
-        setIsDialogOpen(false);
+        setFormData(initialRecordState);
       } catch (error) {
           console.error("Error adding milk record:", error);
           toast({ variant: 'destructive', title: 'Error', description: 'Failed to add milk record.' });
@@ -264,7 +264,7 @@ export default function MilkRecordsPage() {
             </div>
             <DialogFooter>
                 <DialogClose asChild>
-                    <Button type="button" variant="secondary">Cancel</Button>
+                    <Button type="button" variant="secondary">Close</Button>
                 </DialogClose>
                 <Button type="submit" onClick={handleFormSubmit} disabled={isSubmitting}>
                     {isSubmitting ? 'Saving...' : 'Save Record'}
