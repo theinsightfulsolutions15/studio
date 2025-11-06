@@ -152,8 +152,15 @@ export default function LedgerPage() {
       const credit = isReceipt ? tx.amount : 0;
       const debit = !isReceipt ? tx.amount : 0;
       currentBalance += (credit - debit);
+
+      let description = tx.description;
+      if (tx.category === 'Milk Sale' && tx.recordType !== 'Receipt') {
+        description = `Inv#${tx.invoiceNo || ''}: ${tx.quantity || 0}L @ ₹${tx.rate || 0}`;
+      }
+
       return {
         ...tx,
+        description,
         credit,
         debit,
         balance: currentBalance,
