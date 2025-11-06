@@ -125,13 +125,16 @@ service cloud.firestore {
     }
 
     /**
-     * Rules for admin roles collection. Read-only for most, writable only by admins.
+     * Rules for admin roles collection.
      */
     match /roles_admin/{userId} {
-      allow get: if isSignedIn();
-      allow list: if false; // Nobody can list roles directly.
-      // Only an admin can create or update a role document.
-      allow write: if isAdmin() || isOwner(userId);
+      // Admins can read any document.
+      allow get: if isAdmin();
+      // Nobody can list all admin roles.
+      allow list: if false;
+      // Only admins can create/update roles.
+      allow write: if isAdmin();
+      // Nobody can delete roles.
       allow delete: if false;
     }
   }
