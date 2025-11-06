@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   UserCheck,
   BookUser,
+  BookCopy,
 } from 'lucide-react';
 import { doc } from 'firebase/firestore';
 import {
@@ -34,6 +35,7 @@ const baseNavItems: NavItem[] = [
   { href: '/dashboard/movement', title: 'Movement', icon: Truck },
   { href: '/dashboard/milk-records', title: 'Milk Records', icon: GlassWater },
   { href: '/dashboard/finance', title: 'Finance', icon: IndianRupee },
+  { href: '/dashboard/ledger', title: 'Ledger', icon: BookCopy },
   { href: '/dashboard/reports', title: 'Reports', icon: BarChart2 },
 ];
 

@@ -1,3 +1,4 @@
+
 import type { LucideIcon } from "lucide-react";
 
 export type Animal = {
@@ -32,7 +33,7 @@ export type User = {
 export type FinancialRecord = {
   id: string;
   date: string;
-  recordType: 'Receipt' | 'Payment' | 'Expense' | 'Milk Record' | 'Bank Record';
+  recordType: 'Receipt' | 'Payment' | 'Expense' | 'Milk Record' | 'Bank Record' | 'Milk Sale';
   category?: string;
   amount: number;
   description: string;
@@ -97,5 +98,3 @@ export type Account = {
     type: 'Customer' | 'Bank' | 'Expense';
     ownerId?: string;
 };
-
-    
