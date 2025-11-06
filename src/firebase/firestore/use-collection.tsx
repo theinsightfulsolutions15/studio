@@ -61,7 +61,8 @@ export function useCollection<T = any>(
     }
     
     const internalQuery = memoizedTargetRefOrQuery as InternalQuery;
-    const isCollectionGroup = internalQuery?._query?.allDescendants === true;
+    // A collectionGroup query has `allDescendants` and a path with segments of odd length.
+    const isCollectionGroup = internalQuery?._query?.allDescendants === true && internalQuery?._query?.path?.toString().split('/').length % 2 !== 0;
 
     // ✅ अगर path खाली है, तो error throw करो ताकि Firestore root ना call हो
     const path =
