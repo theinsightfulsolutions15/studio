@@ -34,9 +34,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, ChevronsUpDown, Check } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState, useMemo } from 'react';
 import type { Animal, AnimalMovement } from '@/lib/types';
@@ -47,6 +47,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
+
 
 function MovementRowSkeleton() {
   return (
@@ -132,6 +136,7 @@ export default function MovementPage() {
   const [selectedMovement, setSelectedMovement] = useState<AnimalMovement | null>(null);
   const [formData, setFormData] = useState<Omit<AnimalMovement, 'id' | 'ownerId'>>(initialMovementState);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [comboboxOpen, setComboboxOpen] = useState(false);
 
   const animalsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -159,23 +164,21 @@ export default function MovementPage() {
         const statuses = new Map<string, 'in' | 'out'>();
         if (!animals || !allMovements) return statuses;
 
+        const sortedMovements = [...allMovements].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
         const latestMovements = new Map<string, AnimalMovement>();
-        for (const movement of allMovements) {
-            const existing = latestMovements.get(movement.animalId);
-            if (!existing || new Date(movement.date) > new Date(existing.date)) {
-                latestMovements.set(movement.animalId, movement);
-            }
+        for (const movement of sortedMovements) {
+            latestMovements.set(movement.animalId, movement);
         }
         
         for (const animal of animals) {
             const latestMovement = latestMovements.get(animal.id);
-            if (latestMovement && latestMovement.type === 'Entry') {
-                 statuses.set(animal.id, 'in');
-            } else {
+            if (!latestMovement || latestMovement.type === 'Exit') {
                  statuses.set(animal.id, 'out');
+            } else {
+                 statuses.set(animal.id, 'in');
             }
         }
-
         return statuses;
     }, [animals, allMovements]);
 
@@ -324,28 +327,50 @@ export default function MovementPage() {
 
                  <div className="space-y-2">
                     <Label htmlFor="animalId">Animal (by Tag No)</Label>
-                    <Select 
-                        value={formData.animalId} 
-                        onValueChange={(value) => setFormData({...formData, animalId: value })}
-                        disabled={isLoadingAnimals || dialogMode === 'edit'}
-                    >
-                        <SelectTrigger id="animalId">
-                            <SelectValue placeholder="Select an animal..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {isLoadingAnimals ? (
-                                <SelectItem value="loading" disabled>Loading animals...</SelectItem>
-                            ) : availableAnimalsForMovement.length > 0 ? (
-                                availableAnimalsForMovement.map((animal) => (
-                                   <SelectItem key={animal.id} value={animal.id}>{animal.govtTagNo} - {animal.breed}</SelectItem>
-                                ))
-                             ) : (
-                                <SelectItem value="none" disabled>
-                                    {`No animals available for ${formData.type}.`}
-                                </SelectItem>
-                            )}
-                        </SelectContent>
-                    </Select>
+                     <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                        <PopoverTrigger asChild>
+                            <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={comboboxOpen}
+                            className="w-full justify-between"
+                            disabled={isLoadingAnimals || dialogMode === 'edit'}
+                            >
+                            {formData.animalId
+                                ? availableAnimalsForMovement.find((animal) => animal.id === formData.animalId)?.govtTagNo
+                                : "Select an animal..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                            <Command>
+                            <CommandInput placeholder="Search animal..." />
+                            <CommandEmpty>
+                                {isLoadingAnimals ? "Loading animals..." : `No animals available for ${formData.type}.`}
+                            </CommandEmpty>
+                            <CommandGroup>
+                                {availableAnimalsForMovement.map((animal) => (
+                                <CommandItem
+                                    key={animal.id}
+                                    value={`${animal.govtTagNo} ${animal.breed}`}
+                                    onSelect={() => {
+                                        setFormData({...formData, animalId: animal.id });
+                                        setComboboxOpen(false);
+                                    }}
+                                >
+                                    <Check
+                                    className={cn(
+                                        "mr-2 h-4 w-4",
+                                        formData.animalId === animal.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                    />
+                                    {animal.govtTagNo} - {animal.breed}
+                                </CommandItem>
+                                ))}
+                            </CommandGroup>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
                 </div>
 
                  <div className="space-y-2">
