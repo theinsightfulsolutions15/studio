@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -28,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import type { User as AppUser } from '@/lib/types';
 
 export default function SettingsPage() {
   const { user, isUserLoading } = useUser();
@@ -39,7 +41,7 @@ export default function SettingsPage() {
     return doc(firestore, `users/${user.uid}`);
   }, [user, firestore]);
 
-  const { data: userData, isLoading: isUserDocLoading } = useDoc(userDocRef);
+  const { data: userData, isLoading: isUserDocLoading } = useDoc<AppUser>(userDocRef);
 
   // User Profile state
   const [displayName, setDisplayName] = useState('');
@@ -127,7 +129,7 @@ export default function SettingsPage() {
         toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to update your profile.' });
         return;
     }
-    const profileData: { name: string; address: string; mobileNo: string; photoURL?: string } = {
+    const profileData: any = {
         name: displayName,
         address,
         mobileNo,
@@ -289,3 +291,5 @@ export default function SettingsPage() {
     </>
   );
 }
+
+    
