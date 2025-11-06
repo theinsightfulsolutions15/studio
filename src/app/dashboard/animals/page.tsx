@@ -25,7 +25,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MoreHorizontal, PlusCircle, Search } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Search, FileDown, FileUp } from 'lucide-react';
 import Image from 'next/image';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
@@ -68,11 +68,19 @@ export default function AnimalsPage() {
                 <CardTitle>Animals</CardTitle>
                 <CardDescription>Manage and track all animals in the Gaushala.</CardDescription>
             </div>
-            <div className="flex items-center gap-2 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                 <div className="relative flex-1 md:flex-initial">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search animals..." className="pl-8 w-full md:w-[250px] lg:w-[300px]" />
+                    <Input placeholder="Search animals..." className="pl-8 w-full min-w-[150px] md:w-[250px] lg:w-[300px]" />
                 </div>
+                 <Button variant="outline">
+                    <FileUp className="mr-2 h-4 w-4" />
+                    Import
+                </Button>
+                <Button variant="outline">
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Export
+                </Button>
                 <Button className="w-auto">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Register Animal
