@@ -25,11 +25,27 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlusCircle, ChevronsUpDown, Check, Trash2, Plus, Droplets, User } from 'lucide-react';
+import { PlusCircle, ChevronsUpDown, Check, Trash2, Plus, Droplets, MoreHorizontal } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, writeBatch, doc, where } from 'firebase/firestore';
 import type { MilkRecord, Animal, AnimalMovement, FinancialRecord, Account } from '@/lib/types';
@@ -45,7 +61,7 @@ import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
 import { DatePickerWithRange } from '@/components/date-picker-range';
 import { format } from 'date-fns';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
@@ -91,6 +107,15 @@ export default function MilkRecordsPage() {
   const [milkSaleData, setMilkSaleData] = useState(initialMilkSaleState);
   const [customerComboboxOpen, setCustomerComboboxOpen] = useState(false);
 
+  // Edit/Delete State
+  const [editProductionRecord, setEditProductionRecord] = useState<MilkRecord | null>(null);
+  const [isEditProductionDialogOpen, setIsEditProductionDialogOpen] = useState(false);
+  const [deleteProductionRecord, setDeleteProductionRecord] = useState<MilkRecord | null>(null);
+  const [isDeleteProductionAlertOpen, setIsDeleteProductionAlertOpen] = useState(false);
+
+  const [editSaleRecord, setEditSaleRecord] = useState<FinancialRecord | null>(null);
+  const [isDeleteSaleAlertOpen, setIsDeleteSaleAlertOpen] = useState(false);
+
 
   // Page-level State
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
@@ -121,7 +146,7 @@ export default function MilkRecordsPage() {
   
   const milkSalesQuery = useMemoFirebase(() => {
     if(!user || !firestore) return null;
-    return query(collection(firestore, `users/${user.uid}/financial_records`), where('category', '==', 'Milk Sale'));
+    return query(collection(firestore, `users/${user.uid}/financial_records`), where('recordType', 'in', ['Milk Sale', 'Receipt']), where('category', '==', 'Milk Sale'));
   }, [user, firestore]);
   const { data: milkSalesData, isLoading: isLoadingSales } = useCollection<FinancialRecord>(milkSalesQuery);
 
@@ -255,7 +280,7 @@ export default function MilkRecordsPage() {
         const batch = writeBatch(firestore);
         const recordsColRef = collection(firestore, `users/${user.uid}/milk_records`);
         
-        const dateToSave = currentDate ? new Date(currentDate.getTime() - (currentDate.getTimezoneOffset() * -60000)).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+        const dateToSave = currentDate ? new Date(currentDate.getTime() - (currentDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
         stagedRecords.forEach(record => {
             const docRef = doc(recordsColRef);
@@ -296,15 +321,9 @@ export default function MilkRecordsPage() {
     
     setIsSubmittingSale(true);
     try {
-        const financialColRef = collection(firestore, `users/${user.uid}/financial_records`);
-        
-        // If it's a cash customer, it's a direct receipt.
-        // If it's a named customer, it's a credit sale (Milk Sale type)
-        const recordType = milkSaleData.customerName === 'Cash Customer' ? 'Receipt' : 'Milk Sale';
-
         const dataToSave = {
             date: new Date(milkSaleData.date).toISOString().split('T')[0],
-            recordType: recordType,
+            recordType: milkSaleData.customerName === 'Cash Customer' ? 'Receipt' : 'Milk Sale',
             category: 'Milk Sale',
             description: `Milk sale to ${milkSaleData.customerName}`,
             ownerId: user.uid,
@@ -315,10 +334,19 @@ export default function MilkRecordsPage() {
             amount: milkSaleData.amount,
         };
 
-        await addDocumentNonBlocking(financialColRef, dataToSave);
-        toast({ title: 'Success', description: 'Milk sale recorded successfully.'});
+        if(editSaleRecord) {
+            const financialDocRef = doc(firestore, `users/${user.uid}/financial_records`, editSaleRecord.id);
+            await updateDocumentNonBlocking(financialDocRef, dataToSave);
+            toast({ title: 'Success', description: 'Milk sale record updated successfully.'});
+        } else {
+            const financialColRef = collection(firestore, `users/${user.uid}/financial_records`);
+            await addDocumentNonBlocking(financialColRef, dataToSave);
+            toast({ title: 'Success', description: 'Milk sale recorded successfully.'});
+        }
+        
         setIsSalesDialogOpen(false);
         setMilkSaleData(initialMilkSaleState);
+        setEditSaleRecord(null);
 
     } catch (error) {
         console.error("Error saving milk sale:", error);
@@ -331,6 +359,72 @@ export default function MilkRecordsPage() {
   const totalStagedQuantity = useMemo(() => {
     return stagedRecords.reduce((total, record) => total + record.quantity, 0);
   }, [stagedRecords]);
+  
+  const handleEditProductionRecord = async () => {
+    if (!firestore || !user || !editProductionRecord) return;
+
+    setIsSubmittingProduction(true);
+    const docRef = doc(firestore, `users/${user.uid}/milk_records`, editProductionRecord.id);
+    try {
+        await updateDocumentNonBlocking(docRef, {
+            quantity: editProductionRecord.quantity
+        });
+        toast({ title: 'Success', description: 'Production record updated.'});
+        setIsEditProductionDialogOpen(false);
+        setEditProductionRecord(null);
+    } catch(e) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to update record.' });
+    } finally {
+        setIsSubmittingProduction(false);
+    }
+  };
+
+  const handleDeleteProductionRecord = async () => {
+      if(!firestore || !user || !deleteProductionRecord) return;
+      const docRef = doc(firestore, `users/${user.uid}/milk_records`, deleteProductionRecord.id);
+      try {
+        await deleteDocumentNonBlocking(docRef);
+        toast({ title: 'Success', description: 'Production record deleted.'});
+      } catch (e) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete record.' });
+      } finally {
+        setIsDeleteProductionAlertOpen(false);
+        setDeleteProductionRecord(null);
+      }
+  };
+
+  const handleDeleteSaleRecord = async () => {
+      if(!firestore || !user || !editSaleRecord) return;
+      const docRef = doc(firestore, `users/${user.uid}/financial_records`, editSaleRecord.id);
+       try {
+        await deleteDocumentNonBlocking(docRef);
+        toast({ title: 'Success', description: 'Sale record deleted.'});
+      } catch (e) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete record.' });
+      } finally {
+        setIsDeleteSaleAlertOpen(false);
+        setEditSaleRecord(null);
+      }
+  }
+  
+  const openSaleDialog = (sale: FinancialRecord | null) => {
+    if (sale) {
+        setEditSaleRecord(sale);
+        setMilkSaleData({
+            ...sale,
+            date: new Date(sale.date).toISOString()
+        });
+    } else {
+        setEditSaleRecord(null);
+        setMilkSaleData(initialMilkSaleState);
+    }
+    setIsSalesDialogOpen(true);
+  };
+  
+  const openDeleteSaleDialog = (sale: FinancialRecord) => {
+    setEditSaleRecord(sale);
+    setIsDeleteSaleAlertOpen(true);
+  };
 
   const isLoading = isLoadingAnimals || isLoadingProduction || isLoadingMovements || isLoadingSales;
 
@@ -378,7 +472,7 @@ export default function MilkRecordsPage() {
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Add Production
                     </Button>
-                    <Button onClick={() => setIsSalesDialogOpen(true)} variant="secondary">
+                    <Button onClick={() => openSaleDialog(null)} variant="secondary">
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Add Milk Sale
                     </Button>
@@ -420,8 +514,8 @@ export default function MilkRecordsPage() {
                                             </div>
                                             <div className="border rounded-md">
                                             <Table>
-                                                <TableHeader><TableRow><TableHead>Animal Tag</TableHead><TableHead className="text-right">Quantity (L)</TableHead></TableRow></TableHeader>
-                                                <TableBody>{groupedData[date].morning.map(r => (<TableRow key={r.id}><TableCell className="font-medium">{r.animalTag}</TableCell><TableCell className="text-right">{r.quantity.toFixed(2)}</TableCell></TableRow>))}</TableBody>
+                                                <TableHeader><TableRow><TableHead>Animal Tag</TableHead><TableHead className="text-right">Quantity (L)</TableHead><TableHead className="w-10"><span className="sr-only">Actions</span></TableHead></TableRow></TableHeader>
+                                                <TableBody>{groupedData[date].morning.map(r => (<TableRow key={r.id}><TableCell className="font-medium">{r.animalTag}</TableCell><TableCell className="text-right">{r.quantity.toFixed(2)}</TableCell><TableCell><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onSelect={() => {setEditProductionRecord(r); setIsEditProductionDialogOpen(true);}}>Edit</DropdownMenuItem><DropdownMenuItem onSelect={() => {setDeleteProductionRecord(r); setIsDeleteProductionAlertOpen(true);}} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>))}</TableBody>
                                             </Table>
                                             </div>
                                         </div>
@@ -434,8 +528,8 @@ export default function MilkRecordsPage() {
                                             </div>
                                             <div className="border rounded-md">
                                             <Table>
-                                                <TableHeader><TableRow><TableHead>Animal Tag</TableHead><TableHead className="text-right">Quantity (L)</TableHead></TableRow></TableHeader>
-                                                <TableBody>{groupedData[date].evening.map(r => (<TableRow key={r.id}><TableCell className="font-medium">{r.animalTag}</TableCell><TableCell className="text-right">{r.quantity.toFixed(2)}</TableCell></TableRow>))}</TableBody>
+                                                <TableHeader><TableRow><TableHead>Animal Tag</TableHead><TableHead className="text-right">Quantity (L)</TableHead><TableHead className="w-10"><span className="sr-only">Actions</span></TableHead></TableRow></TableHeader>
+                                                <TableBody>{groupedData[date].evening.map(r => (<TableRow key={r.id}><TableCell className="font-medium">{r.animalTag}</TableCell><TableCell className="text-right">{r.quantity.toFixed(2)}</TableCell><TableCell><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onSelect={() => {setEditProductionRecord(r); setIsEditProductionDialogOpen(true);}}>Edit</DropdownMenuItem><DropdownMenuItem onSelect={() => {setDeleteProductionRecord(r); setIsDeleteProductionAlertOpen(true);}} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>))}</TableBody>
                                             </Table>
                                             </div>
                                         </div>
@@ -462,6 +556,7 @@ export default function MilkRecordsPage() {
                                     <TableHead className="text-right">Quantity (L)</TableHead>
                                     <TableHead className="text-right">Rate (₹)</TableHead>
                                     <TableHead className="text-right">Amount (₹)</TableHead>
+                                    <TableHead className="text-right"><span className="sr-only">Actions</span></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -472,6 +567,7 @@ export default function MilkRecordsPage() {
                                         <TableCell className="text-right"><Skeleton className="h-4 w-16" /></TableCell>
                                         <TableCell className="text-right"><Skeleton className="h-4 w-16" /></TableCell>
                                         <TableCell className="text-right"><Skeleton className="h-4 w-20" /></TableCell>
+                                        <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
                                     </TableRow>
                                 ))}
                                 {milkSalesData?.map(sale => (
@@ -481,10 +577,19 @@ export default function MilkRecordsPage() {
                                         <TableCell className="text-right">{sale.quantity?.toFixed(2)}</TableCell>
                                         <TableCell className="text-right">{sale.rate?.toFixed(2)}</TableCell>
                                         <TableCell className="text-right font-semibold">₹{sale.amount.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                    <DropdownMenuItem onSelect={() => openSaleDialog(sale)}>Edit</DropdownMenuItem>
+                                                    <DropdownMenuItem onSelect={() => openDeleteSaleDialog(sale)} className="text-destructive">Delete</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                                 {!isLoadingSales && milkSalesData?.length === 0 && (
-                                    <TableRow><TableCell colSpan={5} className="text-center h-24">No milk sales recorded yet.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={6} className="text-center h-24">No milk sales recorded yet.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
@@ -575,7 +680,7 @@ export default function MilkRecordsPage() {
     <Dialog open={isSalesDialogOpen} onOpenChange={setIsSalesDialogOpen}>
         <DialogContent className="sm:max-w-md">
             <DialogHeader>
-                <DialogTitle>Record Milk Sale</DialogTitle>
+                <DialogTitle>{editSaleRecord ? 'Edit' : 'Record'} Milk Sale</DialogTitle>
                 <DialogDescription>Log a milk sale to a customer. This will be added to your financial records.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -637,9 +742,49 @@ export default function MilkRecordsPage() {
             </DialogFooter>
         </DialogContent>
     </Dialog>
+
+    <Dialog open={isEditProductionDialogOpen} onOpenChange={setIsEditProductionDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Edit Production Record</DialogTitle>
+                <DialogDescription>Update the milk quantity for {editProductionRecord?.animalTag} on {editProductionRecord?.date}.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <Label htmlFor="edit-quantity">Quantity (L)</Label>
+                <Input id="edit-quantity" type="number" value={editProductionRecord?.quantity || ''} onChange={(e) => editProductionRecord && setEditProductionRecord({...editProductionRecord, quantity: Number(e.target.value)})} />
+            </div>
+            <DialogFooter>
+                <Button variant="secondary" onClick={() => setIsEditProductionDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleEditProductionRecord} disabled={isSubmittingProduction}>{isSubmittingProduction ? 'Saving...' : 'Save Changes'}</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <AlertDialog open={isDeleteProductionAlertOpen} onOpenChange={setIsDeleteProductionAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>This will permanently delete the production record for <strong>{deleteProductionRecord?.animalTag}</strong> on {deleteProductionRecord?.date}. This action cannot be undone.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteProductionRecord} className={cn(buttonVariants({ variant: "destructive" }))}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
+     <AlertDialog open={isDeleteSaleAlertOpen} onOpenChange={setIsDeleteSaleAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>This will permanently delete the sale record for <strong>{editSaleRecord?.customerName}</strong> on {editSaleRecord?.date}. This action cannot be undone.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteSaleRecord} className={cn(buttonVariants({ variant: "destructive" }))}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
-
-    
-    

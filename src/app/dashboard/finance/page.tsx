@@ -17,9 +17,25 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { PlusCircle, ChevronsUpDown, Check } from 'lucide-react';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { PlusCircle, ChevronsUpDown, Check, MoreHorizontal } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, writeBatch, doc } from 'firebase/firestore';
@@ -36,6 +52,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 
 function TransactionRowSkeleton() {
@@ -56,13 +73,16 @@ function TransactionRowSkeleton() {
       <TableCell className="text-right">
         <Skeleton className="h-4 w-16" />
       </TableCell>
+       <TableCell className="text-right">
+        <Skeleton className="h-8 w-8" />
+      </TableCell>
     </TableRow>
   );
 }
 
 type TransactionFormData = {
     date: Date | undefined;
-    transactionType: 'Receipt' | 'Payment' | 'Transfer';
+    recordType: 'Receipt' | 'Payment' | 'Transfer' | 'Expense' | 'Bank Record' | 'Milk Record' | 'Milk Sale';
     fromAccount: string | null;
     toAccount: string | null;
     amount: number | '';
@@ -71,7 +91,7 @@ type TransactionFormData = {
 
 const initialFormState: TransactionFormData = {
     date: new Date(),
-    transactionType: 'Receipt',
+    recordType: 'Receipt',
     fromAccount: null,
     toAccount: null,
     amount: '',
@@ -84,8 +104,12 @@ export default function FinancePage() {
   const { toast } = useToast();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<TransactionFormData>(initialFormState);
+  const [formData, setFormData] = useState<Omit<FinancialRecord, 'id' | 'ownerId'>>(initialFormState);
+  const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
+  const [selectedRecord, setSelectedRecord] = useState<FinancialRecord | null>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   
   const [fromPopoverOpen, setFromPopoverOpen] = useState(false);
   const [toPopoverOpen, setToPopoverOpen] = useState(false);
@@ -111,14 +135,33 @@ export default function FinancePage() {
   const receipts = financialData?.filter((t) => t.recordType === 'Receipt');
   const payments = financialData?.filter((t) => t.recordType === 'Payment');
   const expenses = financialData?.filter((t) => t.recordType === 'Expense');
+  const milkSales = financialData?.filter((t) => t.recordType === 'Milk Sale');
 
   const customerAndBankAccounts = useMemo(() => accounts?.filter(a => a.type === 'Customer' || a.type === 'Bank'), [accounts]);
   const expenseAndBankAccounts = useMemo(() => accounts?.filter(a => a.type === 'Expense' || a.type === 'Bank'), [accounts]);
 
 
-  const handleOpenDialog = () => {
-    setFormData(initialFormState);
+  const handleOpenDialog = (mode: 'create' | 'edit', record: FinancialRecord | null = null) => {
+    setDialogMode(mode);
+    if(mode === 'edit' && record) {
+        setSelectedRecord(record);
+        setFormData({
+            ...record,
+            recordType: record.recordType === 'Payment' || record.recordType === 'Receipt' ? record.recordType : 'Transfer', // Simplify for form
+            date: new Date(record.date),
+            fromAccount: record.recordType === 'Payment' ? record.accountId || null : null,
+            toAccount: record.recordType === 'Receipt' ? record.accountId || null : null,
+        });
+    } else {
+        setSelectedRecord(null);
+        setFormData(initialFormState);
+    }
     setIsDialogOpen(true);
+  };
+
+  const openDeleteDialog = (record: FinancialRecord) => {
+    setSelectedRecord(record);
+    setIsDeleteAlertOpen(true);
   };
   
   const handleFormSubmit = async () => {
@@ -130,64 +173,68 @@ export default function FinancePage() {
     setIsSubmitting(true);
 
     try {
-        const batch = writeBatch(firestore);
-        const dateStr = new Date(formData.date.getTime() - (formData.date.getTimezoneOffset() * -60000)).toISOString().split('T')[0];
+        const dateStr = new Date(formData.date.getTime() - (formData.date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 
-        if (formData.transactionType === 'Transfer') {
-            if (!formData.fromAccount || !formData.toAccount) {
-                toast({ variant: 'destructive', title: 'Validation Error', description: 'Both "From" and "To" accounts are required for a transfer.' });
-                setIsSubmitting(false);
-                return;
+        if (dialogMode === 'create') {
+            const batch = writeBatch(firestore);
+            if (formData.recordType === 'Transfer') {
+                if (!formData.fromAccount || !formData.toAccount) {
+                    toast({ variant: 'destructive', title: 'Validation Error', description: 'Both "From" and "To" accounts are required for a transfer.' });
+                    setIsSubmitting(false);
+                    return;
+                }
+                const paymentRef = doc(collection(firestore, `users/${user.uid}/financial_records`));
+                batch.set(paymentRef, { recordType: 'Payment', date: dateStr, accountId: formData.fromAccount, amount: Number(formData.amount), description: `Transfer to ${accounts?.find(a => a.id === formData.toAccount)?.name || 'account'}: ${formData.description}`, category: 'Bank Transfer', ownerId: user.uid });
+                const receiptRef = doc(collection(firestore, `users/${user.uid}/financial_records`));
+                batch.set(receiptRef, { recordType: 'Receipt', date: dateStr, accountId: formData.toAccount, amount: Number(formData.amount), description: `Transfer from ${accounts?.find(a => a.id === formData.fromAccount)?.name || 'account'}: ${formData.description}`, category: 'Bank Transfer', ownerId: user.uid });
+            } else { // Receipt or Payment
+                const accountId = formData.recordType === 'Receipt' ? formData.toAccount : formData.fromAccount;
+                if (!accountId) {
+                     toast({ variant: 'destructive', title: 'Validation Error', description: 'An account must be selected.' });
+                     setIsSubmitting(false);
+                     return;
+                }
+                const recordRef = doc(collection(firestore, `users/${user.uid}/financial_records`));
+                batch.set(recordRef, { date: dateStr, recordType: formData.recordType, accountId: accountId, amount: Number(formData.amount), description: formData.description, category: accounts?.find(a => a.id === accountId)?.type, ownerId: user.uid, });
             }
-            // Create a payment record for the "from" account
-            const paymentRef = doc(collection(firestore, `users/${user.uid}/financial_records`));
-            batch.set(paymentRef, {
-                date: dateStr,
-                recordType: 'Payment',
-                accountId: formData.fromAccount,
-                amount: Number(formData.amount),
-                description: `Transfer to ${accounts?.find(a => a.id === formData.toAccount)?.name || 'account'}: ${formData.description}`,
-                category: 'Bank Transfer',
-                ownerId: user.uid,
-            });
-            // Create a receipt record for the "to" account
-            const receiptRef = doc(collection(firestore, `users/${user.uid}/financial_records`));
-            batch.set(receiptRef, {
-                date: dateStr,
-                recordType: 'Receipt',
-                accountId: formData.toAccount,
-                amount: Number(formData.amount),
-                description: `Transfer from ${accounts?.find(a => a.id === formData.fromAccount)?.name || 'account'}: ${formData.description}`,
-                category: 'Bank Transfer',
-                ownerId: user.uid,
-            });
-        } else { // Receipt or Payment
-            const accountId = formData.transactionType === 'Receipt' ? formData.toAccount : formData.fromAccount;
-            if (!accountId) {
-                 toast({ variant: 'destructive', title: 'Validation Error', description: 'An account must be selected.' });
-                 setIsSubmitting(false);
-                 return;
-            }
-            const recordRef = doc(collection(firestore, `users/${user.uid}/financial_records`));
-            batch.set(recordRef, {
-                date: dateStr,
-                recordType: formData.transactionType,
-                accountId: accountId,
-                amount: Number(formData.amount),
-                description: formData.description,
-                category: accounts?.find(a => a.id === accountId)?.type,
-                ownerId: user.uid,
-            });
+            await batch.commit();
+            toast({ title: 'Success', description: 'Transaction recorded successfully.' });
+        } else if (dialogMode === 'edit' && selectedRecord) {
+             const recordRef = doc(firestore, `users/${user.uid}/financial_records`, selectedRecord.id);
+             const accountId = formData.recordType === 'Receipt' ? formData.toAccount : formData.fromAccount;
+             await updateDocumentNonBlocking(recordRef, {
+                 date: dateStr,
+                 recordType: formData.recordType,
+                 accountId: accountId,
+                 amount: Number(formData.amount),
+                 description: formData.description,
+                 category: accounts?.find(a => a.id === accountId)?.type,
+             });
+             toast({ title: 'Success', description: 'Transaction updated successfully.' });
         }
-
-        await batch.commit();
-        toast({ title: 'Success', description: 'Transaction recorded successfully.' });
+        
         setIsDialogOpen(false);
     } catch (error) {
         console.error('Error submitting transaction:', error);
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to record transaction.' });
     } finally {
         setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!firestore || !user || !selectedRecord) return;
+    
+    const recordDocRef = doc(firestore, `users/${user.uid}/financial_records`, selectedRecord.id);
+    try {
+      await deleteDocumentNonBlocking(recordDocRef);
+      toast({ title: 'Success', description: 'Transaction has been deleted.' });
+    } catch (error) {
+      console.error("Error deleting transaction:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete transaction.' });
+    } finally {
+      setIsDeleteAlertOpen(false);
+      setSelectedRecord(null);
     }
   };
   
@@ -201,11 +248,7 @@ export default function FinancePage() {
         
       const selectedAccountId = type === 'from' ? formData.fromAccount : formData.toAccount;
       const setSelectedAccountId = (id: string | null) => {
-          if (type === 'from') {
-              setFormData(prev => ({...prev, fromAccount: id}));
-          } else {
-              setFormData(prev => ({...prev, toAccount: id}));
-          }
+          setFormData(prev => ({...prev, [`${type}Account`]: id}));
       };
       
       return (
@@ -256,7 +299,7 @@ export default function FinancePage() {
               Track all receipts, payments, and expenses.
             </CardDescription>
           </div>
-          <Button onClick={handleOpenDialog}>
+          <Button onClick={() => handleOpenDialog('create')}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Add Transaction
           </Button>
@@ -269,18 +312,19 @@ export default function FinancePage() {
             <TabsTrigger value="receipts">Receipts</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
             <TabsTrigger value="expenses">Expenses</TabsTrigger>
+            {/* <TabsTrigger value="milk-sales">Milk Sales</TabsTrigger> */}
           </TabsList>
           <TabsContent value="all" className="mt-4">
-            <TransactionsTable data={financialData} isLoading={isLoadingTransactions} accounts={accounts} />
+            <TransactionsTable data={financialData} isLoading={isLoadingTransactions} accounts={accounts} onEdit={(rec) => handleOpenDialog('edit', rec)} onDelete={openDeleteDialog} />
           </TabsContent>
           <TabsContent value="receipts" className="mt-4">
-            <TransactionsTable data={receipts} isLoading={isLoadingTransactions} accounts={accounts}/>
+            <TransactionsTable data={receipts} isLoading={isLoadingTransactions} accounts={accounts} onEdit={(rec) => handleOpenDialog('edit', rec)} onDelete={openDeleteDialog}/>
           </TabsContent>
           <TabsContent value="payments" className="mt-4">
-            <TransactionsTable data={payments} isLoading={isLoadingTransactions} accounts={accounts}/>
+            <TransactionsTable data={payments} isLoading={isLoadingTransactions} accounts={accounts} onEdit={(rec) => handleOpenDialog('edit', rec)} onDelete={openDeleteDialog}/>
           </TabsContent>
           <TabsContent value="expenses" className="mt-4">
-            <TransactionsTable data={expenses} isLoading={isLoadingTransactions} accounts={accounts}/>
+            <TransactionsTable data={expenses} isLoading={isLoadingTransactions} accounts={accounts} onEdit={(rec) => handleOpenDialog('edit', rec)} onDelete={openDeleteDialog}/>
           </TabsContent>
         </Tabs>
       </CardContent>
@@ -295,7 +339,7 @@ export default function FinancePage() {
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-                <DialogTitle>Add New Transaction</DialogTitle>
+                <DialogTitle>{dialogMode === 'create' ? 'Add New Transaction' : 'Edit Transaction'}</DialogTitle>
                 <DialogDescription>Record a receipt, payment, or internal transfer.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -305,8 +349,8 @@ export default function FinancePage() {
                         <DatePicker date={formData.date} setDate={(d) => setFormData(p => ({...p, date: d}))} />
                     </div>
                      <div className="space-y-2">
-                        <Label htmlFor="transactionType">Transaction Type</Label>
-                        <Select value={formData.transactionType} onValueChange={(v: 'Receipt' | 'Payment' | 'Transfer') => setFormData(p => ({...p, transactionType: v}))}>
+                        <Label htmlFor="recordType">Transaction Type</Label>
+                        <Select value={formData.recordType} onValueChange={(v: any) => setFormData(p => ({...p, recordType: v}))}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select type" />
                             </SelectTrigger>
@@ -319,12 +363,12 @@ export default function FinancePage() {
                     </div>
                 </div>
 
-                {formData.transactionType === 'Transfer' ? (
+                {formData.recordType === 'Transfer' ? (
                      <div className="grid grid-cols-2 gap-4">
                         {renderAccountSelector('from', 'From Account', expenseAndBankAccounts, fromPopoverOpen, setFromPopoverOpen)}
                         {renderAccountSelector('to', 'To Account', customerAndBankAccounts, toPopoverOpen, setToPopoverOpen)}
                     </div>
-                ) : formData.transactionType === 'Receipt' ? (
+                ) : formData.recordType === 'Receipt' ? (
                     renderAccountSelector('to', 'To Account', customerAndBankAccounts, toPopoverOpen, setToPopoverOpen)
                 ) : ( // Payment
                     renderAccountSelector('from', 'From Account', expenseAndBankAccounts, fromPopoverOpen, setFromPopoverOpen)
@@ -349,6 +393,23 @@ export default function FinancePage() {
         </DialogContent>
     </Dialog>
 
+     <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete this financial record.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmDelete} className={cn(buttonVariants({ variant: "destructive" }))}>
+                    Delete
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
     </>
   );
 }
@@ -357,10 +418,14 @@ function TransactionsTable({
   data,
   isLoading,
   accounts,
+  onEdit,
+  onDelete,
 }: {
   data: FinancialRecord[] | undefined | null;
   isLoading: boolean;
   accounts: Account[] | undefined | null;
+  onEdit: (record: FinancialRecord) => void;
+  onDelete: (record: FinancialRecord) => void;
 }) {
   const accountMap = useMemo(() => new Map(accounts?.map(a => [a.id, a.name])), [accounts]);
 
@@ -373,6 +438,7 @@ function TransactionsTable({
           <TableHead className="hidden sm:table-cell">Account</TableHead>
           <TableHead className="hidden md:table-cell">Description</TableHead>
           <TableHead className="text-right">Amount</TableHead>
+          <TableHead className="text-right"><span className="sr-only">Actions</span></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -406,11 +472,23 @@ function TransactionsTable({
             <TableCell className="text-right font-medium">
               ₹{record.amount.toFixed(2)}
             </TableCell>
+            <TableCell className="text-right">
+                 <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Actions</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => onEdit(record)} disabled={record.category === 'Bank Transfer' || record.recordType === 'Milk Sale'}>Edit</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => onDelete(record)} className="text-destructive" disabled={record.category === 'Bank Transfer' || record.recordType === 'Milk Sale'}>Delete</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
     </Table>
   );
 }
-
-    

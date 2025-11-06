@@ -26,26 +26,45 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, MoreHorizontal } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { collection, query, doc } from 'firebase/firestore';
 import type { Account } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { cn } from '@/lib/utils';
 
 function AccountRowSkeleton() {
   return (
     <TableRow>
       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
       <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
+      <TableCell><Skeleton className="h-8 w-8" /></TableCell>
     </TableRow>
   );
 }
@@ -60,9 +79,15 @@ export default function AccountsPage() {
   const { user } = useUser();
   const { toast } = useToast();
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [formData, setFormData] = useState<Omit<Account, 'id' | 'ownerId'>>(initialAccountState);
+
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
+
 
   const accountsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -75,10 +100,22 @@ export default function AccountsPage() {
   const bankAccounts = useMemo(() => accounts?.filter(acc => acc.type === 'Bank'), [accounts]);
   const expenseAccounts = useMemo(() => accounts?.filter(acc => acc.type === 'Expense'), [accounts]);
 
-  const openDialog = () => {
-    setFormData(initialAccountState);
-    setIsDialogOpen(true);
+  const openDialog = (mode: 'create' | 'edit', account: Account | null = null) => {
+    setDialogMode(mode);
+    if(mode === 'edit' && account) {
+        setSelectedAccount(account);
+        setFormData(account);
+    } else {
+        setSelectedAccount(null);
+        setFormData(initialAccountState);
+    }
+    setIsFormOpen(true);
   };
+  
+  const openDeleteDialog = (account: Account) => {
+      setAccountToDelete(account);
+      setIsDeleteAlertOpen(true);
+  }
 
   const handleFormSubmit = async () => {
     if (!firestore || !user) {
@@ -91,19 +128,41 @@ export default function AccountsPage() {
     }
 
     setIsSubmitting(true);
-    const accountsColRef = collection(firestore, `users/${user.uid}/accounts`);
     
     try {
-      await addDocumentNonBlocking(accountsColRef, { ...formData, ownerId: user.uid });
-      toast({ title: 'Success', description: 'New account has been created.' });
-      setIsDialogOpen(false);
+        if(dialogMode === 'create') {
+            const accountsColRef = collection(firestore, `users/${user.uid}/accounts`);
+            await addDocumentNonBlocking(accountsColRef, { ...formData, ownerId: user.uid });
+            toast({ title: 'Success', description: 'New account has been created.' });
+        } else if (dialogMode === 'edit' && selectedAccount) {
+            const accountDocRef = doc(firestore, `users/${user.uid}/accounts`, selectedAccount.id);
+            await updateDocumentNonBlocking(accountDocRef, formData);
+            toast({ title: 'Success', description: 'Account has been updated.' });
+        }
+        setIsFormOpen(false);
     } catch (error) {
-      console.error("Error creating account:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to create account.' });
+        console.error("Error saving account:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to save account.' });
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
   };
+
+  const handleConfirmDelete = async () => {
+      if (!firestore || !user || !accountToDelete) return;
+
+      const accountDocRef = doc(firestore, `users/${user.uid}/accounts`, accountToDelete.id);
+      try {
+        await deleteDocumentNonBlocking(accountDocRef);
+        toast({ title: 'Success', description: `Account "${accountToDelete.name}" has been deleted.` });
+      } catch (error) {
+         console.error("Error deleting account:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete account. It might be in use in financial records.' });
+      } finally {
+        setIsDeleteAlertOpen(false);
+        setAccountToDelete(null);
+      }
+  }
 
   return (
     <>
@@ -114,7 +173,7 @@ export default function AccountsPage() {
               <CardTitle>Master Accounts</CardTitle>
               <CardDescription>Manage your customer, bank, and expense accounts.</CardDescription>
             </div>
-            <Button onClick={openDialog}>
+            <Button onClick={() => openDialog('create')}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Add Account
             </Button>
@@ -128,13 +187,13 @@ export default function AccountsPage() {
               <TabsTrigger value="expenses">Expense Accounts</TabsTrigger>
             </TabsList>
             <TabsContent value="customers" className="mt-4">
-              <AccountsTable accounts={customerAccounts} isLoading={isLoading} />
+              <AccountsTable accounts={customerAccounts} isLoading={isLoading} onEdit={(acc) => openDialog('edit', acc)} onDelete={openDeleteDialog} />
             </TabsContent>
             <TabsContent value="banks" className="mt-4">
-              <AccountsTable accounts={bankAccounts} isLoading={isLoading} />
+              <AccountsTable accounts={bankAccounts} isLoading={isLoading} onEdit={(acc) => openDialog('edit', acc)} onDelete={openDeleteDialog}/>
             </TabsContent>
             <TabsContent value="expenses" className="mt-4">
-              <AccountsTable accounts={expenseAccounts} isLoading={isLoading} />
+              <AccountsTable accounts={expenseAccounts} isLoading={isLoading} onEdit={(acc) => openDialog('edit', acc)} onDelete={openDeleteDialog}/>
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -145,12 +204,12 @@ export default function AccountsPage() {
         </CardFooter>
       </Card>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add New Account</DialogTitle>
+            <DialogTitle>{dialogMode === 'create' ? 'Add New Account' : 'Edit Account'}</DialogTitle>
             <DialogDescription>
-              Create a new customer, bank, or expense account.
+             {dialogMode === 'create' ? 'Create a new customer, bank, or expense account.' : 'Update the details for this account.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -191,11 +250,29 @@ export default function AccountsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the account <strong>{accountToDelete?.name}</strong>.
+                    If this account has been used in any financial records, deleting it may cause issues.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmDelete} className={cn(buttonVariants({ variant: "destructive" }))}>
+                    Delete
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
 
-function AccountsTable({ accounts, isLoading }: { accounts: Account[] | null | undefined, isLoading: boolean }) {
+function AccountsTable({ accounts, isLoading, onEdit, onDelete }: { accounts: Account[] | null | undefined, isLoading: boolean, onEdit: (account: Account) => void, onDelete: (account: Account) => void }) {
   return (
     <div className="border rounded-md">
       <Table>
@@ -203,6 +280,7 @@ function AccountsTable({ accounts, isLoading }: { accounts: Account[] | null | u
           <TableRow>
             <TableHead>Account Name</TableHead>
             <TableHead>Type</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -213,11 +291,25 @@ function AccountsTable({ accounts, isLoading }: { accounts: Account[] | null | u
               <TableCell>
                 <Badge variant="secondary">{account.type}</Badge>
               </TableCell>
+              <TableCell className="text-right">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Actions</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => onEdit(account)}>Edit</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => onDelete(account)} className="text-destructive">Delete</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
             </TableRow>
           ))}
           {!isLoading && (!accounts || accounts.length === 0) && (
             <TableRow>
-              <TableCell colSpan={2} className="text-center h-24 text-muted-foreground">
+              <TableCell colSpan={3} className="text-center h-24 text-muted-foreground">
                 No accounts of this type found.
               </TableCell>
             </TableRow>

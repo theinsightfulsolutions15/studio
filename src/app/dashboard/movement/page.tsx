@@ -27,6 +27,16 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -34,7 +44,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, ChevronsUpDown, Check, Search } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, ChevronsUpDown, Check, Search, Trash2 } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -42,7 +52,7 @@ import { useEffect, useState, useMemo } from 'react';
 import type { Animal, AnimalMovement } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
-import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -66,7 +76,7 @@ function MovementRowSkeleton() {
   );
 }
 
-function MovementsTable({ movements, isLoading, onEdit, searchTerm }: { movements: (AnimalMovement & { animalGovtTagNo?: string })[] | null, isLoading: boolean, onEdit: (movement: AnimalMovement) => void, searchTerm?: string }) {
+function MovementsTable({ movements, isLoading, onEdit, onDelete, searchTerm }: { movements: (AnimalMovement & { animalGovtTagNo?: string })[] | null, isLoading: boolean, onEdit: (movement: AnimalMovement) => void, onDelete: (movement: AnimalMovement) => void, searchTerm?: string }) {
     return (
         <Table>
           <TableHeader>
@@ -102,6 +112,7 @@ function MovementsTable({ movements, isLoading, onEdit, searchTerm }: { movement
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onSelect={() => onEdit(movement)}>Edit Record</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => onDelete(movement)} className="text-destructive">Delete Record</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -131,13 +142,15 @@ export default function MovementPage() {
   const { user } = useUser();
   const { toast } = useToast();
   
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [selectedMovement, setSelectedMovement] = useState<AnimalMovement | null>(null);
   const [formData, setFormData] = useState<Omit<AnimalMovement, 'id' | 'ownerId'>>(initialMovementState);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [movementToDelete, setMovementToDelete] = useState<AnimalMovement | null>(null);
 
   const animalsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -215,7 +228,12 @@ export default function MovementPage() {
         setSelectedMovement(null);
         setFormData(prev => ({ ...initialMovementState, type: prev.type, date: new Date().toISOString() }));
     }
-    setIsDialogOpen(true);
+    setIsFormOpen(true);
+  }
+
+  const openDeleteDialog = (movement: AnimalMovement) => {
+    setMovementToDelete(movement);
+    setIsDeleteAlertOpen(true);
   }
 
     const handleMovementTypeChange = (value: 'Entry' | 'Exit') => {
@@ -244,13 +262,29 @@ export default function MovementPage() {
             await updateDocumentNonBlocking(movementDocRef, formData);
             toast({ title: 'Success', description: 'Movement record has been updated.' });
         }
-        setIsDialogOpen(false);
+        setIsFormOpen(false);
     } catch (error) {
         console.error("Error saving movement record:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to save movement record.' });
     } finally {
         setIsSubmitting(false);
     }
+  };
+
+  const handleConfirmDelete = async () => {
+      if (!firestore || !user || !movementToDelete) return;
+      
+      const movementDocRef = doc(firestore, `users/${user.uid}/movements`, movementToDelete.id);
+      try {
+        await deleteDocumentNonBlocking(movementDocRef);
+        toast({ title: 'Success', description: 'Movement record has been deleted.'});
+      } catch (error) {
+        console.error("Error deleting movement:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete movement record.' });
+      } finally {
+        setIsDeleteAlertOpen(false);
+        setMovementToDelete(null);
+      }
   };
 
   const isLoading = isLoadingAll || isLoadingAnimals;
@@ -289,13 +323,13 @@ export default function MovementPage() {
             <TabsTrigger value="exits">Exits</TabsTrigger>
           </TabsList>
           <TabsContent value="all" className="mt-4">
-            <MovementsTable movements={filteredMovements} isLoading={isLoading} onEdit={(mov) => openDialog('edit', mov)} searchTerm={searchTerm} />
+            <MovementsTable movements={filteredMovements} isLoading={isLoading} onEdit={(mov) => openDialog('edit', mov)} onDelete={openDeleteDialog} searchTerm={searchTerm} />
           </TabsContent>
           <TabsContent value="entries" className="mt-4">
-             <MovementsTable movements={entryMovements} isLoading={isLoading} onEdit={(mov) => openDialog('edit', mov)} searchTerm={searchTerm} />
+             <MovementsTable movements={entryMovements} isLoading={isLoading} onEdit={(mov) => openDialog('edit', mov)} onDelete={openDeleteDialog} searchTerm={searchTerm} />
           </TabsContent>
            <TabsContent value="exits" className="mt-4">
-             <MovementsTable movements={exitMovements} isLoading={isLoading} onEdit={(mov) => openDialog('edit', mov)} searchTerm={searchTerm} />
+             <MovementsTable movements={exitMovements} isLoading={isLoading} onEdit={(mov) => openDialog('edit', mov)} onDelete={openDeleteDialog} searchTerm={searchTerm} />
           </TabsContent>
         </Tabs>
       </CardContent>
@@ -306,7 +340,7 @@ export default function MovementPage() {
       </CardFooter>
     </Card>
 
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+    <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-lg">
             <DialogHeader>
                 <DialogTitle>{dialogMode === 'create' ? 'Add Movement Record' : 'Edit Movement Record'}</DialogTitle>
@@ -402,6 +436,23 @@ export default function MovementPage() {
             </DialogFooter>
         </DialogContent>
     </Dialog>
+
+    <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the movement record.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmDelete} className={cn(buttonVariants({ variant: "destructive" }))}>
+                    Delete
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }

@@ -21,6 +21,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -32,13 +33,23 @@ import {
   DialogFooter,
   DialogClose
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MoreHorizontal, PlusCircle, Search, FileDown, FileUp, Camera, Upload } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, doc as firestoreDoc, addDoc } from 'firebase/firestore';
-import type { Animal } from '@/lib/types';
+import type { Animal, AnimalMovement } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
@@ -47,7 +58,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Image from 'next/image';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { cn } from '@/lib/utils';
 
 
 function AnimalRowSkeleton() {
@@ -83,6 +95,18 @@ const initialAnimalState: Omit<Animal, 'id' | 'ownerId'> = {
     imageUrl: '',
 };
 
+type ExitDialogState = {
+    isOpen: boolean;
+    animal: Animal | null;
+    reason: string;
+};
+
+const initialExitDialogState: ExitDialogState = {
+    isOpen: false,
+    animal: null,
+    reason: '',
+}
+
 export default function AnimalsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -93,7 +117,9 @@ export default function AnimalsPage() {
   const [formData, setFormData] = useState<Omit<Animal, 'id' | 'ownerId'>>(initialAnimalState);
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | 'view'>('create');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [exitDialogState, setExitDialogState] = useState<ExitDialogState>(initialExitDialogState);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredAnimals, setFilteredAnimals] = useState<Animal[] | null>(null);
@@ -335,7 +361,7 @@ export default function AnimalsPage() {
         return;
       }
       try {
-        await addDoc(animalsColRef, { ...formData, ownerId: user.uid });
+        await addDocumentNonBlocking(animalsColRef, { ...formData, ownerId: user.uid });
         toast({ title: 'Success', description: 'New animal has been registered.' });
       } catch (error) {
         console.error("Error registering animal:", error);
@@ -358,7 +384,7 @@ export default function AnimalsPage() {
     }
     
     setIsSubmitting(false);
-    setIsDialogOpen(false);
+    setIsFormOpen(false);
   };
   
    const openDialog = (mode: 'create' | 'edit' | 'view', animal: Animal | null = null) => {
@@ -372,7 +398,60 @@ export default function AnimalsPage() {
         setFormData(initialAnimalState);
         setCapturedImage(null);
     }
-    setIsDialogOpen(true);
+    setIsFormOpen(true);
+  };
+  
+  const openDeleteDialog = (animal: Animal) => {
+    setSelectedAnimal(animal);
+    setIsDeleteAlertOpen(true);
+  };
+  
+  const handleConfirmDelete = async () => {
+      if (!firestore || !user || !selectedAnimal) return;
+      
+      const animalDocRef = firestoreDoc(firestore, `users/${user.uid}/animals`, selectedAnimal.id);
+      try {
+        await deleteDocumentNonBlocking(animalDocRef);
+        toast({ title: 'Success', description: `Animal ${selectedAnimal.govtTagNo} has been deleted.`});
+      } catch (error) {
+        console.error("Error deleting animal:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete animal. Check if it has related records.' });
+      } finally {
+        setIsDeleteAlertOpen(false);
+        setSelectedAnimal(null);
+      }
+  };
+  
+  const openExitDialog = (animal: Animal) => {
+      setExitDialogState({ isOpen: true, animal, reason: ''});
+  };
+  
+  const handleConfirmExit = async () => {
+      const { animal, reason } = exitDialogState;
+      if (!firestore || !user || !animal || !reason) {
+          toast({ variant: 'destructive', title: 'Error', description: 'A reason for exit is required.' });
+          return;
+      }
+      
+      setIsSubmitting(true);
+      const movementData: Omit<AnimalMovement, 'id' | 'ownerId'> = {
+          animalId: animal.id,
+          type: 'Exit',
+          date: new Date().toISOString(),
+          reason: reason,
+      };
+
+      const movementsColRef = collection(firestore, `users/${user.uid}/movements`);
+      try {
+        await addDocumentNonBlocking(movementsColRef, { ...movementData, ownerId: user.uid });
+        toast({ title: 'Success', description: `Animal ${animal.govtTagNo} has been marked as exited.`});
+      } catch (error) {
+        console.error("Error marking animal as exited:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to record animal exit.'});
+      } finally {
+        setIsSubmitting(false);
+        setExitDialogState(initialExitDialogState);
+      }
   };
   
   const dialogTitles = {
@@ -485,7 +564,9 @@ export default function AnimalsPage() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onSelect={() => openDialog('view', animal)}>View Details</DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => openDialog('edit', animal)}>Edit</DropdownMenuItem>
-                      <DropdownMenuItem>Mark as Exited</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => openExitDialog(animal)}>Mark as Exited</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => openDeleteDialog(animal)} className="text-destructive">Delete</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -508,7 +589,7 @@ export default function AnimalsPage() {
       </CardFooter>
     </Card>
 
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+    <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-4xl">
             <DialogHeader>
                 <DialogTitle>{dialogTitles[dialogMode]}</DialogTitle>
@@ -629,6 +710,52 @@ export default function AnimalsPage() {
                         {isSubmitting ? 'Saving...' : (dialogMode === 'create' ? 'Register Animal' : 'Save Changes')}
                     </Button>
                 )}
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+    
+    <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the animal record for <strong>{selectedAnimal?.govtTagNo}</strong>.
+                    All related data (movements, milk records) will NOT be deleted but will be orphaned.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmDelete} className={cn(buttonVariants({ variant: "destructive" }))}>
+                    Delete Permanently
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    
+    <Dialog open={exitDialogState.isOpen} onOpenChange={(isOpen) => setExitDialogState(p => ({...p, isOpen}))}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Mark Animal as Exited</DialogTitle>
+                <DialogDescription>
+                    Create an exit record for animal <strong>{exitDialogState.animal?.govtTagNo}</strong>.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                    <Label htmlFor="exitReason">Reason for Exit</Label>
+                    <Input 
+                        id="exitReason" 
+                        value={exitDialogState.reason}
+                        onChange={(e) => setExitDialogState(p => ({...p, reason: e.target.value}))}
+                        placeholder="e.g., Adopted, Deceased, Transferred"
+                    />
+                </div>
+            </div>
+             <DialogFooter>
+                <DialogClose asChild><Button variant="secondary">Cancel</Button></DialogClose>
+                <Button onClick={handleConfirmExit} disabled={isSubmitting || !exitDialogState.reason}>
+                    {isSubmitting ? 'Saving...' : 'Confirm Exit'}
+                </Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>
