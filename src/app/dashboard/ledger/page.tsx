@@ -102,51 +102,51 @@ export default function LedgerPage() {
     if (!financialRecords || !selectedAccountId) {
       return { transactions: [], openingBalance: 0, closingBalance: 0 };
     }
-    
+
     const filteredByAccount = financialRecords.filter(record => {
-        if (selectedAccountId === 'cash-customer') {
-            return record.category === 'Milk Sale' && record.recordType === 'Receipt'
-        }
-        return record.accountId === selectedAccountId;
+      if (selectedAccountId === 'cash-customer') {
+        return record.category === 'Milk Sale' && (record.recordType === 'Receipt' || record.recordType === 'Milk Sale');
+      }
+      return record.accountId === selectedAccountId;
     });
 
     const sortedTransactions = filteredByAccount.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    let currentBalance = 0;
+
     const startDate = dateRange?.from ? new Date(dateRange.from) : null;
-    if (startDate) startDate.setHours(0,0,0,0);
+    if (startDate) startDate.setHours(0, 0, 0, 0);
 
-    const openingBal = sortedTransactions.reduce((acc, tx) => {
-        const txDate = new Date(tx.date);
-        txDate.setHours(0,0,0,0);
-
-        if (startDate && txDate >= startDate) {
-            return acc;
-        }
-
-        const isReceipt = tx.recordType === 'Receipt';
-        const credit = isReceipt ? tx.amount : 0;
-        const debit = !isReceipt ? tx.amount : 0;
-        return acc + credit - debit;
-    }, 0);
+    const openingBal = startDate
+      ? sortedTransactions
+          .filter(tx => {
+            const txDate = new Date(tx.date);
+            txDate.setHours(0, 0, 0, 0);
+            return txDate < startDate;
+          })
+          .reduce((acc, tx) => {
+            const isReceipt = tx.recordType === 'Receipt';
+            const credit = isReceipt ? tx.amount : 0;
+            const debit = !isReceipt ? tx.amount : 0;
+            return acc + credit - debit;
+          }, 0)
+      : 0;
 
     const transactionsInRange = sortedTransactions.filter(tx => {
-        const txDate = new Date(tx.date);
-        txDate.setHours(0,0,0,0);
-        
-        const from = dateRange?.from ? new Date(dateRange.from) : null;
-        if(from) from.setHours(0,0,0,0);
+      const txDate = new Date(tx.date);
+      txDate.setHours(0, 0, 0, 0);
 
-        const to = dateRange?.to ? new Date(dateRange.to) : null;
-        if(to) to.setHours(0,0,0,0);
+      const from = dateRange?.from ? new Date(dateRange.from) : null;
+      if (from) from.setHours(0, 0, 0, 0);
 
-        if (from && to) return txDate >= from && txDate <= to;
-        if (from) return txDate >= from;
-        if (to) return txDate <= to;
-        return true; // No date range specified, include all
+      const to = dateRange?.to ? new Date(dateRange.to) : null;
+      if (to) to.setHours(0, 0, 0, 0);
+
+      if (from && to) return txDate >= from && txDate <= to;
+      if (from) return txDate >= from;
+      if (to) return txDate <= to;
+      return true; // No date range specified, include all
     });
-    
-    currentBalance = openingBal;
+
+    let currentBalance = openingBal;
     const transactionsWithBalance = transactionsInRange.map(tx => {
       const isReceipt = tx.recordType === 'Receipt';
       const credit = isReceipt ? tx.amount : 0;
@@ -167,12 +167,11 @@ export default function LedgerPage() {
       };
     });
 
-    return { 
-        transactions: transactionsWithBalance, 
-        openingBalance: openingBal, 
-        closingBalance: currentBalance 
+    return {
+      transactions: transactionsWithBalance,
+      openingBalance: openingBal,
+      closingBalance: currentBalance,
     };
-
   }, [financialRecords, selectedAccountId, dateRange]);
 
   const isLoading = isLoadingAccounts || isLoadingRecords || isLoadingUser;
@@ -230,13 +229,15 @@ export default function LedgerPage() {
       tx.balance.toFixed(2)
     ]);
     
-    tableData.unshift([
-      '', // Date
-      'Opening Balance', // Description
-      '', // Debit
-      '', // Credit
-      openingBalance.toFixed(2) // Balance
-    ]);
+    if (dateRange?.from) {
+        tableData.unshift([
+            '', // Date
+            'Opening Balance', // Description
+            '', // Debit
+            '', // Credit
+            openingBalance.toFixed(2) // Balance
+        ]);
+    }
 
     doc.autoTable({
       startY: currentY,
@@ -341,7 +342,7 @@ export default function LedgerPage() {
                 </TableRow>
               )}
               
-              {transactions.length > 0 && (
+              {transactions.length > 0 && dateRange?.from && (
                 <TableRow className="bg-muted/50 font-semibold">
                     <TableCell colSpan={4}>Opening Balance</TableCell>
                     <TableCell className={cn("text-right", openingBalance < 0 ? "text-destructive" : "")}>
