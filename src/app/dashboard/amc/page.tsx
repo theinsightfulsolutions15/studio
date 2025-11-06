@@ -99,6 +99,7 @@ export default function AmcRenewalsPage() {
 
       await updateDocumentNonBlocking(userDocRef, {
         validityDate: newValidityDate.toISOString().split('T')[0],
+        status: 'Active'
       });
 
       await updateDocumentNonBlocking(renewalDocRef, {

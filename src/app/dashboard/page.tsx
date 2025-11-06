@@ -156,15 +156,17 @@ export default function Dashboard() {
       today.setHours(0, 0, 0, 0); // Compare dates only, not time
       const validity = new Date(user.validityDate);
       setIsExpired(validity < today);
+    } else if (user && user.status === 'Expired') {
+        setIsExpired(true);
     } else {
-      setIsExpired(false);
+        setIsExpired(false);
     }
   }, [user]);
 
 
   return (
     <div className="space-y-6">
-      {isExpired && !isUserLoading && <AmcRenewalForm />}
+      {(isExpired && !isUserLoading) && <AmcRenewalForm />}
       <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
       
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

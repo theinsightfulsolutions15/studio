@@ -229,6 +229,24 @@
         "startDate",
         "endDate"
       ]
+    },
+    "AmcRenewal": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AmcRenewal",
+      "type": "object",
+      "description": "Represents a user-submitted request for AMC renewal.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the renewal request." },
+        "userId": { "type": "string", "description": "ID of the user requesting renewal." },
+        "userName": { "type": "string", "description": "Name of the user." },
+        "customerId": { "type": "string", "description": "Customer ID of the user." },
+        "date": { "type": "string", "format": "date", "description": "Date of the renewal transaction." },
+        "amount": { "type": "number", "description": "Amount paid for the renewal." },
+        "transactionType": { "type": "string", "description": "Method of payment (e.g., RTGS, UPI)." },
+        "status": { "type": "string", "enum": ["Pending", "Approved"], "description": "Status of the renewal request." },
+        "submittedAt": { "type": "string", "format": "date-time", "description": "Timestamp when the request was submitted." }
+      },
+      "required": ["id", "userId", "userName", "date", "amount", "transactionType", "status", "submittedAt"]
     }
   },
   "auth": {
@@ -273,6 +291,17 @@
               "description": "The unique identifier for the AMC Detail."
             }
           ]
+        }
+      },
+      {
+        "path": "/amc_renewals/{renewalId}",
+        "definition": {
+            "entityName": "AmcRenewal",
+            "schema": { "$ref": "#/backend/entities/AmcRenewal" },
+            "description": "Stores user-submitted AMC renewal requests. Readable by admins, writable by the user who owns it.",
+            "params": [
+                { "name": "renewalId", "description": "The unique ID for the renewal request." }
+            ]
         }
       },
       {

@@ -60,6 +60,9 @@ service cloud.firestore {
      */
     function isAccountActive() {
         let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+        if (userDoc.status == 'Expired') {
+          return false;
+        }
         if (!('validityDate' in userDoc) || userDoc.validityDate == '') {
             return userDoc.status == 'Active'; // For users without a validity date, just check status
         }

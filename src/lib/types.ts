@@ -77,3 +77,11 @@ export type AmcRenewal = {
     status: 'Pending' | 'Approved';
     submittedAt: any; // Firestore Timestamp
 };
+
+export type AmcDetail = {
+    id: string;
+    userId: string;
+    startDate: string;
+    endDate: string;
+    description: string;
+};
