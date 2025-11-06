@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   UserCheck,
 } from 'lucide-react';
-
+import { doc } from 'firebase/firestore';
 import {
   SidebarContent,
   SidebarMenu,
@@ -23,17 +23,23 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from '@/components/ui/sidebar';
-import type { NavItem } from '@/lib/types';
+import type { NavItem, User as AppUser } from '@/lib/types';
 import Logo from './logo';
-import { Separator } from './ui/separator';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 
-const navItems: NavItem[] = [
+const baseNavItems: NavItem[] = [
   { href: '/dashboard', title: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/animals', title: 'Animals', icon: Beef },
   { href: '/dashboard/movement', title: 'Movement', icon: Truck },
   { href: '/dashboard/milk-records', title: 'Milk Records', icon: GlassWater },
   { href: '/dashboard/finance', title: 'Finance', icon: IndianRupee },
   { href: '/dashboard/reports', title: 'Reports', icon: BarChart2 },
+];
+
+const adminNavItems: NavItem[] = [
+    { href: '/dashboard/users', title: 'Users', icon: Users },
+    { href: '/dashboard/user-approvals', title: 'User Approvals', icon: UserCheck },
+    { href: '/dashboard/amc', title: 'AMC Renewals', icon: ShieldCheck },
 ];
 
 const settingsItem: NavItem = {
@@ -44,6 +50,20 @@ const settingsItem: NavItem = {
 
 export default function Nav() {
   const pathname = usePathname();
+  const { user: authUser } = useUser();
+  const firestore = useFirestore();
+
+  const userDocRef = useMemoFirebase(() => {
+    if (!authUser || !firestore) return null;
+    return doc(firestore, 'users', authUser.uid);
+  }, [authUser, firestore]);
+
+  const { data: currentUser, isLoading } = useDoc<AppUser>(userDocRef);
+
+  const isAdmin = currentUser?.role === 'Admin';
+
+  const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems;
+
 
   return (
     <>
@@ -52,7 +72,17 @@ export default function Nav() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {navItems.map((item) => (
+          {isLoading && Array.from({ length: 6 }).map((_, i) => (
+             <SidebarMenuItem key={i}>
+                <SidebarMenuButton tooltip="Loading..." asChild>
+                    <div className="flex items-center gap-2 p-2">
+                        <div className="h-4 w-4 bg-muted rounded" />
+                        <div className="h-4 w-20 bg-muted rounded" />
+                    </div>
+                </SidebarMenuButton>
+             </SidebarMenuItem>
+          ))}
+          {!isLoading && navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild
