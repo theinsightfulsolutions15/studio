@@ -19,7 +19,7 @@ import {
   TableFooter,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { ChevronsUpDown, Check } from 'lucide-react';
+import { ChevronsUpDown, Check, FileDown } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import type { FinancialRecord, Account } from '@/lib/types';
@@ -30,7 +30,17 @@ import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from '
 import { cn } from '@/lib/utils';
 import { DatePickerWithRange } from '@/components/date-picker-range';
 import type { DateRange } from 'react-day-picker';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
+
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
 
 function LedgerRowSkeleton() {
   return (
@@ -47,6 +57,7 @@ function LedgerRowSkeleton() {
 export default function LedgerPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
   
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -153,6 +164,67 @@ export default function LedgerPage() {
 
   const isLoading = isLoadingAccounts || isLoadingRecords;
 
+  const handleDownloadPdf = () => {
+    if (!selectedAccountId) {
+      toast({
+        variant: 'destructive',
+        title: 'Download Failed',
+        description: 'Please select an account first.',
+      });
+      return;
+    }
+    
+    const doc = new jsPDF();
+    
+    const title = `Ledger for: ${selectedAccountName}`;
+    const dateStr = dateRange?.from
+      ? `From: ${format(dateRange.from, 'dd/MM/yyyy')} ${dateRange.to ? `To: ${format(dateRange.to, 'dd/MM/yyyy')}` : ''}`
+      : 'All Dates';
+
+    doc.setFontSize(18);
+    doc.text(title, 14, 22);
+    doc.setFontSize(11);
+    doc.text(dateStr, 14, 30);
+    
+    const tableData = transactions.map(tx => [
+      tx.date,
+      tx.description,
+      tx.debit > 0 ? tx.debit.toFixed(2) : '-',
+      tx.credit > 0 ? tx.credit.toFixed(2) : '-',
+      tx.balance.toFixed(2)
+    ]);
+    
+    tableData.unshift([
+      '', // Date
+      'Opening Balance', // Description
+      '', // Debit
+      '', // Credit
+      openingBalance.toFixed(2) // Balance
+    ]);
+
+    doc.autoTable({
+      startY: 36,
+      head: [['Date', 'Description', 'Debit (₹)', 'Credit (₹)', 'Balance (₹)']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [22, 163, 74] },
+      foot: [
+          ['', '', '', 'Closing Balance', closingBalance.toFixed(2)]
+      ],
+      footStyles: { fontStyle: 'bold', fontSize: 10 },
+      didDrawCell: (data) => {
+        if(data.section === 'body' && data.column.index > 1) { // align numeric columns to right
+            data.cell.styles.halign = 'right';
+        }
+        if(data.section === 'foot' && data.column.index > 1) {
+            data.cell.styles.halign = 'right';
+        }
+      }
+    });
+    
+    doc.save(`Ledger_${selectedAccountName.replace(/ /g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   return (
     <>
       <Card>
@@ -193,6 +265,10 @@ export default function LedgerPage() {
                     </PopoverContent>
                 </Popover>
                 <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+                <Button onClick={handleDownloadPdf} disabled={!selectedAccountId || transactions.length === 0}>
+                    <FileDown className="mr-2 h-4 w-4" />
+                    PDF
+                </Button>
             </div>
           </div>
         </CardHeader>
