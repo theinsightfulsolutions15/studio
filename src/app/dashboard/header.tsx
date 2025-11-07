@@ -78,28 +78,44 @@ export default function Header() {
   const { data: userData } = useDoc<AppUser>(userDocRef);
   const isAdmin = userData?.role === 'Admin';
 
-  // --- Admin Specific Notifications ---
+  // --- Admin Specific Notifications (User Requests) ---
    const adminNotificationsQuery = useMemoFirebase(() => (
     isAdmin && firestore ? query(collection(firestore, 'admin_notifications'), where('read', '==', false), orderBy('createdAt', 'desc')) : null
   ), [isAdmin, firestore]);
   const { data: adminNotifications } = useCollection<AppNotification>(adminNotificationsQuery);
 
 
-  // --- User Specific Notifications ---
-  const sickAnimalsQuery = useMemoFirebase(() => (
-      user && firestore ? query(collection(firestore, `users/${user.uid}/animals`), where('healthStatus', 'in', ['Sick', 'Under Treatment'])) : null
-  ), [user, firestore]);
-  const { data: sickAnimals } = useCollection<Animal>(sickAnimalsQuery);
-  
+  // --- User-Specific Personal Notifications ---
   const userNotificationsQuery = useMemoFirebase(() => (
     user && firestore ? query(collection(firestore, `users/${user.uid}/notifications`), where('read', '==', false), orderBy('createdAt', 'desc')) : null
   ), [user, firestore]);
   const { data: userNotifications } = useCollection<AppNotification>(userNotificationsQuery);
 
-  const adminNotificationsCount = adminNotifications?.length ?? 0;
-  const userSpecificNotificationsCount = (sickAnimals?.length ?? 0) + (userNotifications?.length ?? 0);
+  // --- User-Specific Health Alerts ---
+  const sickAnimalsQuery = useMemoFirebase(() => (
+      user && firestore ? query(collection(firestore, `users/${user.uid}/animals`), where('healthStatus', 'in', ['Sick', 'Under Treatment'])) : null
+  ), [user, firestore]);
+  const { data: sickAnimals } = useCollection<Animal>(sickAnimalsQuery);
+  
 
-  const totalNotificationsCount = isAdmin ? adminNotificationsCount + userSpecificNotificationsCount : userSpecificNotificationsCount;
+  const adminNotificationsCount = adminNotifications?.length ?? 0;
+  
+  const allUserNotifications = useMemo(() => [
+      ...(userNotifications || []),
+      ...(sickAnimals?.map(a => ({
+          id: `sick-${a.id}`,
+          title: "Animal Health Alert",
+          description: `Animal ${a.govtTagNo} is ${a.healthStatus}.`,
+          createdAt: new Date(), // This won't be accurate, but it's for display
+          href: '/dashboard/master/animals',
+          icon: 'Activity' as const,
+          read: false,
+      })) || [])
+  ], [userNotifications, sickAnimals]);
+
+  const userNotificationsCount = allUserNotifications.length;
+
+  const totalNotificationsCount = isAdmin ? adminNotificationsCount + userNotificationsCount : userNotificationsCount;
 
   const handleLogout = () => {
     if (auth) {
@@ -127,7 +143,11 @@ export default function Header() {
         });
     }
 
-    await batch.commit();
+    try {
+        await batch.commit();
+    } catch(e) {
+        console.error("Failed to mark all notifications as read", e);
+    }
   };
 
   const displayName = userData?.name || user?.displayName;
@@ -143,18 +163,6 @@ export default function Header() {
     }
   };
   
-  const allUserNotifications = [
-      ...(userNotifications || []),
-      ...(sickAnimals?.map(a => ({
-          id: `sick-${a.id}`,
-          title: "Animal Health Alert",
-          description: `Animal ${a.govtTagNo} is ${a.healthStatus}.`,
-          createdAt: new Date(), // This won't be accurate, but it's for display
-          href: '/dashboard/master/animals',
-          icon: 'Activity' as const,
-          read: false,
-      })) || [])
-  ];
 
   return (
     <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-4 border-b bg-card px-4 md:px-6">
@@ -189,6 +197,7 @@ export default function Header() {
                 </div>
             ) : (
                 <>
+                {/* Regular user notifications (or admin's own) */}
                 {allUserNotifications?.map(n => (
                      <DropdownMenuItem key={n.id} asChild>
                         <Link href={n.href || '#'} className="flex flex-col items-start gap-1">
@@ -200,26 +209,22 @@ export default function Header() {
                         </Link>
                     </DropdownMenuItem>
                 ))}
+                 {/* Admin-only notifications */}
                  {isAdmin && (adminNotificationsCount > 0) && (
-                    <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>
-                            <UserCheck className="h-4 w-4 text-blue-500 mr-2" />
-                            Admin Actions ({adminNotificationsCount})
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="p-0">
-                             {adminNotifications?.map(n => (
-                                <DropdownMenuItem key={n.id} asChild>
-                                    <Link href={n.href || '#'} className="flex flex-col items-start gap-1">
-                                        <div className="flex items-center gap-2">
-                                            {getIcon(n.icon)}
-                                            <p className="font-medium">{n.title}</p>
-                                        </div>
-                                        <p className="pl-6 text-xs text-muted-foreground">{n.description}</p>
-                                    </Link>
-                                </DropdownMenuItem>
-                            ))}
-                        </DropdownMenuSubContent>
-                    </DropdownMenuSub>
+                    <>
+                    {userNotificationsCount > 0 && <DropdownMenuSeparator />}
+                    {adminNotifications?.map(n => (
+                        <DropdownMenuItem key={n.id} asChild>
+                            <Link href={n.href || '#'} className="flex flex-col items-start gap-1">
+                                <div className="flex items-center gap-2">
+                                    {getIcon(n.icon)}
+                                    <p className="font-medium">{n.title}</p>
+                                </div>
+                                <p className="pl-6 text-xs text-muted-foreground">{n.description}</p>
+                            </Link>
+                        </DropdownMenuItem>
+                    ))}
+                    </>
                 )}
                 </>
             )}
