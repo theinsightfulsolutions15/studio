@@ -85,10 +85,10 @@ export default function Header() {
   const { data: adminNotifications } = useCollection<AppNotification>(adminNotificationsQuery);
 
 
-  // --- User-Specific Personal Notifications ---
+  // --- User-Specific Personal Notifications (ONLY for Admins now) ---
   const userNotificationsQuery = useMemoFirebase(() => (
-    user && firestore ? query(collection(firestore, `users/${user.uid}/notifications`), where('read', '==', false), orderBy('createdAt', 'desc')) : null
-  ), [user, firestore]);
+    user && firestore && isAdmin ? query(collection(firestore, `users/${user.uid}/notifications`), where('read', '==', false), orderBy('createdAt', 'desc')) : null
+  ), [user, firestore, isAdmin]);
   const { data: userNotifications } = useCollection<AppNotification>(userNotificationsQuery);
 
   // --- User-Specific Health Alerts ---
@@ -100,22 +100,37 @@ export default function Header() {
 
   const adminNotificationsCount = adminNotifications?.length ?? 0;
   
-  const personalNotifications = useMemo(() => [
-      ...(userNotifications || []),
-      ...(sickAnimals?.map(a => ({
+  const personalNotifications = useMemo(() => {
+      // For admins, combine personal notifications and sick animal alerts
+      if (isAdmin) {
+          return [
+              ...(userNotifications || []),
+              ...(sickAnimals?.map(a => ({
+                  id: `sick-${a.id}`,
+                  title: "Animal Health Alert",
+                  description: `Animal ${a.govtTagNo} is ${a.healthStatus}.`,
+                  createdAt: new Date(), // This won't be accurate, but it's for display
+                  href: '/dashboard/master/animals',
+                  icon: 'Activity' as const,
+                  read: false,
+              })) || [])
+          ];
+      }
+      // For regular users, only show sick animal alerts
+      return sickAnimals?.map(a => ({
           id: `sick-${a.id}`,
           title: "Animal Health Alert",
           description: `Animal ${a.govtTagNo} is ${a.healthStatus}.`,
-          createdAt: new Date(), // This won't be accurate, but it's for display
+          createdAt: new Date(),
           href: '/dashboard/master/animals',
           icon: 'Activity' as const,
           read: false,
-      })) || [])
-  ], [userNotifications, sickAnimals]);
+      })) || [];
+  }, [userNotifications, sickAnimals, isAdmin]);
 
   const personalNotificationsCount = personalNotifications.length;
 
-  const totalNotificationsCount = isAdmin ? adminNotificationsCount + personalNotificationsCount : personalNotificationsCount;
+  const totalNotificationsCount = isAdmin ? adminNotificationsCount + personalNotificationsCount : 0; // Only admins see the count badge
 
   const handleLogout = () => {
     if (auth) {
@@ -126,10 +141,10 @@ export default function Header() {
   };
 
   const markAllAsRead = async () => {
-    if (!firestore || !user) return;
+    if (!firestore || !user || !isAdmin) return; // Only allow admins to perform this
     const batch = writeBatch(firestore);
 
-    if (isAdmin && adminNotifications) {
+    if (adminNotifications) {
         adminNotifications.forEach(notif => {
             const notifRef = doc(firestore, 'admin_notifications', notif.id);
             batch.update(notifRef, { read: true });
@@ -198,7 +213,7 @@ export default function Header() {
                     </div>
                 ) : (
                     <>
-                    {/* Personal notifications (for all users including admin) */}
+                    {/* Personal notifications (for admin) */}
                     {personalNotifications?.map(n => (
                         <DropdownMenuItem key={n.id} asChild>
                             <Link href={n.href || '#'} className="flex flex-col items-start gap-1">
@@ -211,7 +226,7 @@ export default function Header() {
                         </DropdownMenuItem>
                     ))}
                     {/* Admin-only notifications */}
-                    {isAdmin && adminNotificationsCount > 0 && (
+                    {adminNotificationsCount > 0 && (
                         <>
                         {personalNotificationsCount > 0 && <DropdownMenuSeparator />}
                         {adminNotifications?.map(n => (
