@@ -49,13 +49,11 @@ service cloud.firestore {
      */
     match /users/{userId} {
       // Allow a user to read their own profile. Admins can read any profile.
-      allow get: if isOwner(userId) || isAdmin();
+      allow get, list: if isOwner(userId) || isAdmin();
       // Only active users or admins can update/delete profiles.
       allow update, delete: if (isAdmin() || isOwner(userId)) && isAccountActive();
       // Any signed-in user can create their own profile during signup.
       allow create: if isSignedIn();
-      // Admins can list all users, but individual users cannot.
-      allow list: if isAdmin();
 
       /**
        * Rules for user notifications.
@@ -87,6 +85,17 @@ service cloud.firestore {
       match /accounts/{accountId} {
         allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
       }
+    }
+    
+    // Admins can perform collection group queries on these collections
+    match /{path=**}/animals/{animalId} {
+      allow get, list: if isAdmin();
+    }
+    match /{path=**}/milk_records/{milkRecordId} {
+      allow get, list: if isAdmin();
+    }
+     match /{path=**}/financial_records/{financialRecordId} {
+      allow get, list: if isAdmin();
     }
 
     /**

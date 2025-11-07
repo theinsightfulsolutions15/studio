@@ -32,7 +32,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { collection, serverTimestamp, doc, query, where, writeBatch } from 'firebase/firestore';
+import { collection, serverTimestamp, doc, query, where, writeBatch, collectionGroup } from 'firebase/firestore';
 import { useState, useEffect, useMemo } from 'react';
 import { DatePicker } from '@/components/ui/date-picker';
 import type { User as AppUser, Animal, MilkRecord, FinancialRecord } from '@/lib/types';
@@ -202,28 +202,25 @@ export default function Dashboard() {
   // For admins, we need to query all users' data. For regular users, just their own.
   const animalsQuery = useMemoFirebase(() => {
       if (!firestore) return null;
-      if (isAdmin) return collection(firestore, 'animals');
+      if (isAdmin) return collectionGroup(firestore, 'animals');
       if (authUser) return collection(firestore, `users/${authUser.uid}/animals`);
       return null;
   }, [firestore, authUser, isAdmin]);
 
   const milkRecordsQuery = useMemoFirebase(() => {
       if (!firestore) return null;
-      if (isAdmin) return collection(firestore, 'milk_records');
+      if (isAdmin) return collectionGroup(firestore, 'milk_records');
       if (authUser) return collection(firestore, `users/${authUser.uid}/milk_records`);
       return null;
   }, [firestore, authUser, isAdmin]);
   
   const financialRecordsQuery = useMemoFirebase(() => {
       if (!firestore) return null;
-      if (isAdmin) return collection(firestore, 'financial_records');
+      if (isAdmin) return collectionGroup(firestore, 'financial_records');
       if (authUser) return collection(firestore, `users/${authUser.uid}/financial_records`);
       return null;
   }, [firestore, authUser, isAdmin]);
 
-  // UseCollection for admin would need to iterate through all users if data is nested.
-  // This simplified approach assumes top-level collections for admin for demonstration.
-  // In a real multi-tenant app with nested data, this would need a more complex query strategy for admins.
   const { data: animals, isLoading: isLoadingAnimals } = useCollection<Animal>(animalsQuery);
   const { data: milkRecords, isLoading: isLoadingMilk } = useCollection<MilkRecord>(milkRecordsQuery);
   const { data: financialRecords, isLoading: isLoadingFinancial } = useCollection<FinancialRecord>(financialRecordsQuery);
