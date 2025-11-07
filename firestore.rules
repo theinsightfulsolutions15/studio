@@ -58,57 +58,34 @@ service cloud.firestore {
       allow list: if isAdmin();
 
       /**
-       * Rules for nested animal records.
-       */
-      match /animals/{animalId} {
-        // Owner or Admin can perform any action on a specific document, but only if their account is active.
-        allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
-      }
-      
-      /**
-       * Rules for nested movement records.
-       */
-      match /movements/{movementId} {
-        allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
-      }
-      
-      /**
-       * Rules for nested financial records.
-       */
-      match /financial_records/{financialRecordId} {
-        allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
-      }
-
-      /**
-       * Rules for nested milk records.
-       */
-      match /milk_records/{milkRecordId} {
-        allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
-      }
-       
-      /**
-       * Rules for nested reports.
-       */
-       match /reports/{reportId} {
-         allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
-       }
-
-      /**
-       * Rules for nested account records.
-       */
-      match /accounts/{accountId} {
-        allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
-      }
-      
-      /**
        * Rules for user notifications.
        * Users should be able to manage their notifications even if their account is expired.
        */
       match /notifications/{notificationId} {
         // Users can read, update (to mark as read), list, and delete their own notifications.
-        allow read, update, delete, list: if isOwner(userId);
-        // Admins can create notifications for users.
-        allow create: if isAdmin();
+        allow read, write, list: if isOwner(userId);
+      }
+
+      /**
+       * Rules for other nested collections that REQUIRE an active account.
+       */
+       match /animals/{animalId} {
+        allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
+      }
+      match /movements/{movementId} {
+        allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
+      }
+      match /financial_records/{financialRecordId} {
+        allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
+      }
+      match /milk_records/{milkRecordId} {
+        allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
+      }
+      match /reports/{reportId} {
+         allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
+       }
+      match /accounts/{accountId} {
+        allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
       }
     }
 
