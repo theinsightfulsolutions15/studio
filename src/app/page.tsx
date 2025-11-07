@@ -72,7 +72,7 @@ export default function LoginPage() {
             setIsVerifying(false);
         });
     }
-  }, [user, isUserLoading, auth, firestore, router, toast]);
+  }, [user, isUserLoading, auth, firestore, router]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
