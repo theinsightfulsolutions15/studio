@@ -100,7 +100,7 @@ export default function Header() {
 
   const adminNotificationsCount = adminNotifications?.length ?? 0;
   
-  const allUserNotifications = useMemo(() => [
+  const personalNotifications = useMemo(() => [
       ...(userNotifications || []),
       ...(sickAnimals?.map(a => ({
           id: `sick-${a.id}`,
@@ -113,9 +113,9 @@ export default function Header() {
       })) || [])
   ], [userNotifications, sickAnimals]);
 
-  const userNotificationsCount = allUserNotifications.length;
+  const personalNotificationsCount = personalNotifications.length;
 
-  const totalNotificationsCount = isAdmin ? adminNotificationsCount + userNotificationsCount : userNotificationsCount;
+  const totalNotificationsCount = isAdmin ? adminNotificationsCount + personalNotificationsCount : personalNotificationsCount;
 
   const handleLogout = () => {
     if (auth) {
@@ -197,8 +197,8 @@ export default function Header() {
                 </div>
             ) : (
                 <>
-                {/* Regular user notifications (or admin's own) */}
-                {allUserNotifications?.map(n => (
+                {/* Personal notifications (for all users including admin) */}
+                {personalNotifications?.map(n => (
                      <DropdownMenuItem key={n.id} asChild>
                         <Link href={n.href || '#'} className="flex flex-col items-start gap-1">
                             <div className="flex items-center gap-2">
@@ -210,9 +210,9 @@ export default function Header() {
                     </DropdownMenuItem>
                 ))}
                  {/* Admin-only notifications */}
-                 {isAdmin && (adminNotificationsCount > 0) && (
+                 {isAdmin && adminNotificationsCount > 0 && (
                     <>
-                    {userNotificationsCount > 0 && <DropdownMenuSeparator />}
+                    {personalNotificationsCount > 0 && <DropdownMenuSeparator />}
                     {adminNotifications?.map(n => (
                         <DropdownMenuItem key={n.id} asChild>
                             <Link href={n.href || '#'} className="flex flex-col items-start gap-1">
