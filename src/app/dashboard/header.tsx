@@ -173,47 +173,33 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-4">
-         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative rounded-full">
-              <Bell className="h-5 w-5" />
-              {totalNotificationsCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-4 w-4 justify-center rounded-full p-0 text-xs">{totalNotificationsCount}</Badge>
-              )}
-              <span className="sr-only">Toggle notifications</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[350px]">
-            <DropdownMenuLabel className="flex justify-between items-center">
-              <span>Notifications</span>
-               {(totalNotificationsCount > 0) && (
-                <Button variant="link" size="sm" className="h-auto p-0" onClick={markAllAsRead}>Mark all as read</Button>
-              )}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {totalNotificationsCount === 0 ? (
-                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                    You have no new notifications.
-                </div>
-            ) : (
-                <>
-                {/* Personal notifications (for all users including admin) */}
-                {personalNotifications?.map(n => (
-                     <DropdownMenuItem key={n.id} asChild>
-                        <Link href={n.href || '#'} className="flex flex-col items-start gap-1">
-                            <div className="flex items-center gap-2">
-                                {getIcon(n.icon)}
-                                <p className="font-medium">{n.title}</p>
-                            </div>
-                            <p className="pl-6 text-xs text-muted-foreground">{n.description}</p>
-                        </Link>
-                    </DropdownMenuItem>
-                ))}
-                 {/* Admin-only notifications */}
-                 {isAdmin && adminNotificationsCount > 0 && (
+         {isAdmin && (
+            <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative rounded-full">
+                <Bell className="h-5 w-5" />
+                {totalNotificationsCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-4 w-4 justify-center rounded-full p-0 text-xs">{totalNotificationsCount}</Badge>
+                )}
+                <span className="sr-only">Toggle notifications</span>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[350px]">
+                <DropdownMenuLabel className="flex justify-between items-center">
+                <span>Notifications</span>
+                {(totalNotificationsCount > 0) && (
+                    <Button variant="link" size="sm" className="h-auto p-0" onClick={markAllAsRead}>Mark all as read</Button>
+                )}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {totalNotificationsCount === 0 ? (
+                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                        You have no new notifications.
+                    </div>
+                ) : (
                     <>
-                    {personalNotificationsCount > 0 && <DropdownMenuSeparator />}
-                    {adminNotifications?.map(n => (
+                    {/* Personal notifications (for all users including admin) */}
+                    {personalNotifications?.map(n => (
                         <DropdownMenuItem key={n.id} asChild>
                             <Link href={n.href || '#'} className="flex flex-col items-start gap-1">
                                 <div className="flex items-center gap-2">
@@ -224,12 +210,28 @@ export default function Header() {
                             </Link>
                         </DropdownMenuItem>
                     ))}
+                    {/* Admin-only notifications */}
+                    {isAdmin && adminNotificationsCount > 0 && (
+                        <>
+                        {personalNotificationsCount > 0 && <DropdownMenuSeparator />}
+                        {adminNotifications?.map(n => (
+                            <DropdownMenuItem key={n.id} asChild>
+                                <Link href={n.href || '#'} className="flex flex-col items-start gap-1">
+                                    <div className="flex items-center gap-2">
+                                        {getIcon(n.icon)}
+                                        <p className="font-medium">{n.title}</p>
+                                    </div>
+                                    <p className="pl-6 text-xs text-muted-foreground">{n.description}</p>
+                                </Link>
+                            </DropdownMenuItem>
+                        ))}
+                        </>
+                    )}
                     </>
                 )}
-                </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </DropdownMenuContent>
+            </DropdownMenu>
+         )}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
