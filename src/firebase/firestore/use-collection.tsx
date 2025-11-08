@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -44,7 +45,6 @@ export function useCollection<T = any>(
   useEffect(() => {
     // ✅ If no query or ref provided, just skip
     if (!memoizedTargetRefOrQuery) {
-      console.warn('⚠️ Skipping useCollection — Firestore reference is null.');
       setData(null);
       setIsLoading(false);
       setError(null);
@@ -65,11 +65,10 @@ export function useCollection<T = any>(
 
       // 🧩 Path validation — only for normal collections
       if (!isCollectionGroup && (!path || path.trim() === '' || path === '/')) {
-        console.error(
-          '❌ Firestore path is empty or invalid — useCollection() requires a valid collection.'
-        );
-        setError(new Error('Invalid Firestore collection path'));
+        // Instead of logging an error, we just return and set loading to false.
+        // This handles cases where dependencies for the query are not ready yet.
         setIsLoading(false);
+        setData(null);
         return;
       }
 
@@ -92,7 +91,6 @@ export function useCollection<T = any>(
               ? `CollectionGroup(${internalQuery._query.path.toString()})`
               : path,
           });
-          console.error('⚠️ Firestore Permission Error:', contextualError);
           setError(contextualError);
           setData(null);
           setIsLoading(false);
