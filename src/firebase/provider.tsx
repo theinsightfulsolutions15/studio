@@ -168,27 +168,9 @@ export const useFirebase = (): FirebaseServicesAndUser => {
 };
 
 /** Hook to access Firebase Auth instance. */
-export const useAuth = (): FirebaseServicesAndUser => {
-  const context = useContext(FirebaseContext);
-
-  if (context === undefined) {
-    throw new Error('useAuth must be used within a FirebaseProvider.');
-  }
-  
-  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth) {
-    throw new Error('Firebase core services not available. Check FirebaseProvider props.');
-  }
-
-  return {
-      firebaseApp: context.firebaseApp,
-      firestore: context.firestore,
-      auth: context.auth,
-      user: context.user,
-      isUserLoading: context.isUserLoading,
-      userError: context.userError,
-      isAdmin: context.isAdmin,
-      isMaintenanceMode: context.isMaintenanceMode,
-  };
+export const useAuth = (): Auth => {
+  const { auth } = useFirebase();
+  return auth;
 };
 
 /** Hook to access Firestore instance. */
