@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileDown, FileText, Sheet as ExcelIcon, Search } from 'lucide-react';
+import { FileText, Sheet as ExcelIcon, Search } from 'lucide-react';
 import { DatePickerWithRange } from '@/components/date-picker-range';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,10 +23,12 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
-import { format } from 'date-fns';
+import { format, eachDayOfInterval, startOfDay, subDays } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import type { DateRange } from 'react-day-picker';
+
 
 declare module 'jspdf' {
   interface jsPDF {
@@ -358,6 +360,282 @@ function MovementHistoryReport() {
     );
 }
 
+type DailySummaryRow = {
+    date: string;
+    openingMale: number;
+    openingFemale: number;
+    opening0_3yr: number;
+    openingGt3yr: number;
+    inMale: number;
+    inFemale: number;
+    in0_3yr: number;
+    inGt3yr: number;
+    inReasons: string;
+    outMale: number;
+    outFemale: number;
+    out0_3yr: number;
+    outGt3yr: number;
+    outReasons: string;
+    closingMale: number;
+    closingFemale: number;
+    closing0_3yr: number;
+    closingGt3yr: number;
+};
+
+function DailySummaryReport() {
+    const firestore = useFirestore();
+    const { user } = useUser();
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({ from: subDays(new Date(), 7), to: new Date() });
+
+    const animalsQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return collection(firestore, `users/${user.uid}/animals`);
+    }, [user, firestore]);
+
+    const movementsQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return collection(firestore, `users/${user.uid}/movements`);
+    }, [user, firestore]);
+
+    const { data: animals, isLoading: isLoadingAnimals } = useCollection<Animal>(animalsQuery);
+    const { data: movements, isLoading: isLoadingMovements } = useCollection<AnimalMovement>(movementsQuery);
+    
+    const animalMap = useMemo(() => new Map(animals?.map(a => [a.id, a])), [animals]);
+    
+    const dailySummaryData = useMemo(() => {
+        if (!animals || !movements || !dateRange?.from) return [];
+
+        const startDate = startOfDay(dateRange.from);
+        const endDate = dateRange.to ? startOfDay(dateRange.to) : startDate;
+        
+        const sortedMovements = movements.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        // Calculate initial opening balance for the first day of the range
+        let openingBalance = { male: 0, female: 0, '0-3yr': 0, '>3yr': 0 };
+        const animalInitialState = new Map<string, { gender: 'Male' | 'Female'; age: number }>();
+        animals.forEach(animal => {
+            const age = startDate.getFullYear() - animal.yearOfBirth;
+            animalInitialState.set(animal.id, { gender: animal.gender, age });
+        });
+
+        const animalsPresentAtStart = new Set<string>();
+
+        // Consider animals without any movements before the start date as present from the beginning
+        const animalsWithMovements = new Set(movements.map(m => m.animalId));
+        animals.forEach(animal => {
+            if (!animalsWithMovements.has(animal.id)) {
+                animalsPresentAtStart.add(animal.id);
+            }
+        });
+        
+        sortedMovements.forEach(m => {
+            const movementDate = startOfDay(new Date(m.date));
+            if (movementDate < startDate) {
+                if (m.type === 'Entry') animalsPresentAtStart.add(m.animalId);
+                if (m.type === 'Exit') animalsPresentAtStart.delete(m.animalId);
+            }
+        });
+        
+        animalsPresentAtStart.forEach(animalId => {
+            const animalDetails = animalMap.get(animalId);
+            if (animalDetails) {
+                const age = startDate.getFullYear() - animalDetails.yearOfBirth;
+                if (animalDetails.gender === 'Male') openingBalance.male++;
+                else openingBalance.female++;
+
+                if (age <= 3) openingBalance['0-3yr']++;
+                else openingBalance['>3yr']++;
+            }
+        });
+
+
+        const dateArray = eachDayOfInterval({ start: startDate, end: endDate });
+        const reportData: DailySummaryRow[] = [];
+
+        dateArray.forEach(currentDate => {
+            const currentDayMovements = sortedMovements.filter(m => startOfDay(new Date(m.date)).getTime() === currentDate.getTime());
+
+            const inMovements = currentDayMovements.filter(m => m.type === 'Entry');
+            const outMovements = currentDayMovements.filter(m => m.type === 'Exit');
+            
+            const dailyIn = { male: 0, female: 0, '0-3yr': 0, '>3yr': 0, reasons: [] as string[] };
+            const dailyOut = { male: 0, female: 0, '0-3yr': 0, '>3yr': 0, reasons: [] as string[] };
+
+            inMovements.forEach(m => {
+                const animal = animalMap.get(m.animalId);
+                if (animal) {
+                    const age = currentDate.getFullYear() - animal.yearOfBirth;
+                    if (animal.gender === 'Male') dailyIn.male++;
+                    else dailyIn.female++;
+
+                    if (age <= 3) dailyIn['0-3yr']++;
+                    else dailyIn['>3yr']++;
+                    if(m.reason) dailyIn.reasons.push(m.reason);
+                }
+            });
+
+            outMovements.forEach(m => {
+                const animal = animalMap.get(m.animalId);
+                if (animal) {
+                    const age = currentDate.getFullYear() - animal.yearOfBirth;
+                    if (animal.gender === 'Male') dailyOut.male++;
+                    else dailyOut.female++;
+
+                    if (age <= 3) dailyOut['0-3yr']++;
+                    else dailyOut['>3yr']++;
+                    if(m.reason) dailyOut.reasons.push(m.reason);
+                }
+            });
+            
+            const closingBalance = {
+                male: openingBalance.male + dailyIn.male - dailyOut.male,
+                female: openingBalance.female + dailyIn.female - dailyOut.female,
+                '0-3yr': openingBalance['0-3yr'] + dailyIn['0-3yr'] - dailyOut['0-3yr'],
+                '>3yr': openingBalance['>3yr'] + dailyIn['>3yr'] - dailyOut['>3yr'],
+            };
+
+            reportData.push({
+                date: format(currentDate, 'dd-MM-yyyy'),
+                openingMale: openingBalance.male,
+                openingFemale: openingBalance.female,
+                opening0_3yr: openingBalance['0-3yr'],
+                openingGt3yr: openingBalance['>3yr'],
+                inMale: dailyIn.male,
+                inFemale: dailyIn.female,
+                in0_3yr: dailyIn['0-3yr'],
+                inGt3yr: dailyIn['>3yr'],
+                inReasons: dailyIn.reasons.join(', '),
+                outMale: dailyOut.male,
+                outFemale: dailyOut.female,
+                out0_3yr: dailyOut['0-3yr'],
+                outGt3yr: dailyOut['>3yr'],
+                outReasons: dailyOut.reasons.join(', '),
+                closingMale: closingBalance.male,
+                closingFemale: closingBalance.female,
+                closing0_3yr: closingBalance['0-3yr'],
+                closingGt3yr: closingBalance['>3yr'],
+            });
+
+            openingBalance = closingBalance;
+        });
+
+        return reportData;
+    }, [animals, movements, dateRange, animalMap]);
+
+    const isLoading = isLoadingAnimals || isLoadingMovements;
+
+    const exportToExcel = () => {
+        const worksheet = XLSX.utils.json_to_sheet(dailySummaryData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Daily Summary");
+        XLSX.writeFile(workbook, "Daily_Summary_Report.xlsx");
+    };
+
+    const exportToPdf = () => {
+        const doc = new jsPDF({ orientation: 'landscape' });
+        doc.text("Daily Summary Report", 14, 15);
+        
+        const tableData = dailySummaryData.map(row => Object.values(row));
+        const head = [
+            'Date', 'Open M', 'Open F', 'Open 0-3', 'Open >3', 'In M', 'In F', 'In 0-3', 'In >3', 'In Reasons',
+            'Out M', 'Out F', 'Out 0-3', 'Out >3', 'Out Reasons', 'Close M', 'Close F', 'Close 0-3', 'Close >3'
+        ];
+
+        doc.autoTable({
+            startY: 20,
+            head: [head],
+            body: tableData,
+            styles: { fontSize: 7, cellPadding: 1 },
+            headStyles: { fontStyle: 'bold', fontSize: 7, fillColor: [22, 163, 74] },
+        });
+
+        doc.save('Daily_Summary_Report.pdf');
+    };
+
+    return (
+         <Card>
+            <CardHeader>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <CardTitle>Daily Summary</CardTitle>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        <DatePickerWithRange date={dateRange} setDate={setDateRange} />
+                        <div className="flex gap-2">
+                           <Button variant="outline" size="icon" onClick={exportToExcel} disabled={isLoading || dailySummaryData.length === 0}><ExcelIcon className="h-4 w-4" /></Button>
+                           <Button variant="outline" size="icon" onClick={exportToPdf} disabled={isLoading || dailySummaryData.length === 0}><FileText className="h-4 w-4" /></Button>
+                        </div>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                 <div className="w-full overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead rowSpan={2}>Date</TableHead>
+                                <TableHead colSpan={4} className="text-center border-l border-r">Opening</TableHead>
+                                <TableHead colSpan={5} className="text-center border-r">In</TableHead>
+                                <TableHead colSpan={5} className="text-center border-r">Out</TableHead>
+                                <TableHead colSpan={4} className="text-center border-r">Closing</TableHead>
+                            </TableRow>
+                            <TableRow>
+                                <TableHead className="text-center border-l">M</TableHead>
+                                <TableHead className="text-center">F</TableHead>
+                                <TableHead className="text-center">0-3</TableHead>
+                                <TableHead className="text-center border-r">&gt;3</TableHead>
+                                <TableHead className="text-center">M</TableHead>
+                                <TableHead className="text-center">F</TableHead>
+                                <TableHead className="text-center">0-3</TableHead>
+                                <TableHead className="text-center">&gt;3</TableHead>
+                                <TableHead className="text-center border-r">Reasons</TableHead>
+                                <TableHead className="text-center">M</TableHead>
+                                <TableHead className="text-center">F</TableHead>
+                                <TableHead className="text-center">0-3</TableHead>
+                                <TableHead className="text-center">&gt;3</TableHead>
+                                <TableHead className="text-center border-r">Reasons</TableHead>
+                                <TableHead className="text-center">M</TableHead>
+                                <TableHead className="text-center">F</TableHead>
+                                <TableHead className="text-center">0-3</TableHead>
+                                <TableHead className="text-center border-r">&gt;3</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading && <tr><TableCell colSpan={19}><Skeleton className="h-20 w-full"/></TableCell></tr>}
+                            {!isLoading && dailySummaryData.map(row => (
+                                <TableRow key={row.date}>
+                                    <TableCell>{row.date}</TableCell>
+                                    <TableCell className="text-center border-l">{row.openingMale}</TableCell>
+                                    <TableCell className="text-center">{row.openingFemale}</TableCell>
+                                    <TableCell className="text-center">{row.opening0_3yr}</TableCell>
+                                    <TableCell className="text-center border-r">{row.openingGt3yr}</TableCell>
+                                    <TableCell className="text-center">{row.inMale}</TableCell>
+                                    <TableCell className="text-center">{row.inFemale}</TableCell>
+                                    <TableCell className="text-center">{row.in0_3yr}</TableCell>
+                                    <TableCell className="text-center">{row.inGt3yr}</TableCell>
+                                    <TableCell className="text-center border-r max-w-xs truncate">{row.inReasons}</TableCell>
+                                    <TableCell className="text-center">{row.outMale}</TableCell>
+                                    <TableCell className="text-center">{row.outFemale}</TableCell>
+                                    <TableCell className="text-center">{row.out0_3yr}</TableCell>
+                                    <TableCell className="text-center">{row.outGt3yr}</TableCell>
+                                    <TableCell className="text-center border-r max-w-xs truncate">{row.outReasons}</TableCell>
+                                    <TableCell className="text-center">{row.closingMale}</TableCell>
+                                    <TableCell className="text-center">{row.closingFemale}</TableCell>
+                                    <TableCell className="text-center">{row.closing0_3yr}</TableCell>
+                                    <TableCell className="text-center border-r">{row.closingGt3yr}</TableCell>
+                                </TableRow>
+                            ))}
+                            {!isLoading && dailySummaryData.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={19} className="h-24 text-center">No data for selected date range.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                 </div>
+            </CardContent>
+         </Card>
+    );
+}
+
 
 export default function ReportsPage() {
   return (
@@ -370,7 +648,7 @@ export default function ReportsPage() {
         <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full md:w-auto">
             <TabsTrigger value="animal-registry">Animal Registry</TabsTrigger>
             <TabsTrigger value="movement-history">Movement History</TabsTrigger>
-            <TabsTrigger value="daily-summary" disabled>Daily Summary</TabsTrigger>
+            <TabsTrigger value="daily-summary">Daily Summary</TabsTrigger>
             <TabsTrigger value="cross-tab" disabled>Cross-Tab Summary</TabsTrigger>
             <TabsTrigger value="detailed-report" disabled>Detailed Report</TabsTrigger>
         </TabsList>
@@ -380,6 +658,9 @@ export default function ReportsPage() {
         </TabsContent>
         <TabsContent value="movement-history" className="mt-4">
             <MovementHistoryReport />
+        </TabsContent>
+        <TabsContent value="daily-summary" className="mt-4">
+            <DailySummaryReport />
         </TabsContent>
       </Tabs>
       
