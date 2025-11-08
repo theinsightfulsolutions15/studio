@@ -578,14 +578,15 @@ function DailySummaryReport() {
                  <div className="w-full overflow-x-auto">
                     <Table>
                         <TableHeader>
-                            <TableRow>
-                                <TableHead rowSpan={2} className="text-left align-middle border-r min-w-[120px]">Date</TableHead>
+                             <TableRow>
+                                <TableHead className="text-left border-r min-w-[120px]">Date</TableHead>
                                 <TableHead colSpan={4} className="text-center border-r">OPENING</TableHead>
                                 <TableHead colSpan={5} className="text-center border-r">IN</TableHead>
                                 <TableHead colSpan={5} className="text-center border-r">OUT</TableHead>
                                 <TableHead colSpan={4} className="text-center">CLOSING</TableHead>
                             </TableRow>
                             <TableRow>
+                                <TableHead className="border-r"></TableHead>
                                 <TableHead className="text-center">M</TableHead>
                                 <TableHead className="text-center">F</TableHead>
                                 <TableHead className="text-center">0-3</TableHead>
@@ -1119,19 +1120,6 @@ export default function ReportsPage() {
             <DetailedReport />
         </TabsContent>
       </Tabs>
-      
-       <Card>
-        <CardHeader>
-          <CardTitle>Year-End Closing</CardTitle>
-          <CardDescription>Close the financial year and archive all data. This action is irreversible.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-              <p className="text-sm font-medium text-destructive-foreground text-center sm:text-left">Proceed with caution. All current year data will be finalized.</p>
-              <Button variant="destructive" className="w-full sm:w-auto">Close Financial Year</Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
