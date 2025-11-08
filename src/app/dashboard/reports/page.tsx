@@ -427,13 +427,14 @@ function DailySummaryReport() {
         let openingBalance = { male: 0, female: 0, '0-3yr': 0, '>3yr': 0 };
         
         const animalStateAtStart: { [key: string]: 'in' | 'out' } = {};
+        const animalsToProcessIds = new Set(animalsToProcess.map(a => a.id));
 
         animalsToProcess.forEach(animal => {
             const lastMovementBeforeStart = sortedMovements
                 .filter(m => m.animalId === animal.id && startOfDay(new Date(m.date)) < startDate)
                 .pop();
             
-            if (lastMovementBeforeStart && lastMovementBeforeStart.type === 'Entry') {
+            if (lastMovementBeforeStart?.type === 'Entry') {
                 animalStateAtStart[animal.id] = 'in';
             } else {
                 animalStateAtStart[animal.id] = 'out';
@@ -705,6 +706,7 @@ export default function ReportsPage() {
     </div>
   );
 }
+
 
 
 
