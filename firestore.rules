@@ -113,10 +113,11 @@ service cloud.firestore {
 
     /**
      * Rules for system status (e.g., maintenance mode).
+     * This document should be publicly readable so the app can check for maintenance
+     * mode before a user is authenticated or their status is verified.
      */
     match /system/{docId} {
-      // Allow any signed-in user to read system status.
-      allow get, list: if isSignedIn();
+      allow get, list: if true;
       // Only admins can change system status.
       allow write: if isAdmin();
     }
