@@ -182,6 +182,7 @@ export default function SettingsPage() {
   };
 
   const cleanDataForExport = (data: any[], fieldsToRemove: string[]) => {
+    if (!data) return [];
     return data.map(item => {
         const newItem = { ...item };
         fieldsToRemove.forEach(field => delete newItem[field]);
@@ -280,28 +281,28 @@ export default function SettingsPage() {
 
     const handleConfirmRestore = async () => {
         if (!firestore || !selectedFile || !isAdmin) return;
-
+    
         setIsRestoring(true);
         setIsRestoreAlertOpen(false);
-
+    
         const statusDocRef = doc(firestore, 'system', 'status');
         await setDoc(statusDocRef, { isMaintenanceMode: true });
-
+    
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
                 const data = e.target?.result;
                 const workbook = XLSX.read(data, { type: 'array' });
-                
+                const batch = writeBatch(firestore);
+    
                 if (restoreMode === 'full') {
-                    // Full Restore Logic
-                    const batch = writeBatch(firestore);
+                    // Full Restore Logic: Iterate through all sheets
                     for (const sheetName of workbook.SheetNames) {
                         const worksheet = workbook.Sheets[sheetName];
                         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
-
+    
                         if (sheetName === 'All User Profiles') {
-                             for (const record of jsonData) {
+                            for (const record of jsonData) {
                                 const docRef = doc(firestore, 'users', record.id);
                                 batch.set(docRef, record);
                             }
@@ -309,54 +310,58 @@ export default function SettingsPage() {
                             const [userIdentifier, ...collectionParts] = sheetName.split('_');
                             const collectionName = collectionParts.join('_');
                             
-                            const user = allUsers?.find(u => u.customerId === userIdentifier || u.id.substring(0,5) === userIdentifier);
+                            // Find the user by customerId or a substring of their UID
+                            const user = allUsers?.find(u => u.customerId === userIdentifier || u.id.substring(0, 5) === userIdentifier);
+    
                             if (user) {
                                 for (const record of jsonData) {
-                                    const docRef = doc(firestore, `users/${user.id}/${collectionName}`, record.id);
-                                    batch.set(docRef, record);
+                                    if (record.id) { // Ensure record has an ID
+                                      const docRef = doc(firestore, `users/${user.id}/${collectionName}`, String(record.id));
+                                      batch.set(docRef, record);
+                                    }
                                 }
                             }
                         }
                     }
-                    await batch.commit();
                     toast({ title: 'Full Restore Successful', description: 'All data has been restored from the backup.' });
                 } else if (restoreMode === 'user' && selectedUserId) {
                     // User-wise Restore Logic
-                     const selectedUser = allUsers?.find(u => u.id === selectedUserId);
-                     if (!selectedUser) {
-                        toast({ variant: 'destructive', title: 'Restore Failed', description: 'Selected user not found.' });
-                        setIsRestoring(false);
-                        return;
-                     }
-                     const userIdentifier = selectedUser.customerId || selectedUser.id.substring(0,5);
-                     
-                     const batch = writeBatch(firestore);
-
-                     for (const sheetName of workbook.SheetNames) {
+                    const selectedUser = allUsers?.find(u => u.id === selectedUserId);
+                    if (!selectedUser) {
+                        throw new Error('Selected user not found.');
+                    }
+                    const userIdentifier = selectedUser.customerId || selectedUser.id.substring(0, 5);
+    
+                    // Iterate through sheets and only process those belonging to the selected user
+                    for (const sheetName of workbook.SheetNames) {
                         if (sheetName.startsWith(userIdentifier)) {
-                           const [, ...collectionParts] = sheetName.split('_');
-                           const collectionName = collectionParts.join('_');
-                           const worksheet = workbook.Sheets[sheetName];
-                           const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
-
+                            const [, ...collectionParts] = sheetName.split('_');
+                            const collectionName = collectionParts.join('_');
+                            const worksheet = workbook.Sheets[sheetName];
+                            const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+    
                             for (const record of jsonData) {
-                                const docRef = doc(firestore, `users/${selectedUserId}/${collectionName}`, record.id);
-                                batch.set(docRef, record);
+                               if (record.id) { // Ensure record has an ID
+                                  const docRef = doc(firestore, `users/${selectedUserId}/${collectionName}`, String(record.id));
+                                  batch.set(docRef, record);
+                               }
                             }
                         }
-                     }
-                    await batch.commit();
+                    }
                     toast({ title: 'User Restore Successful', description: `Data for ${selectedUser.name} has been restored.` });
                 }
+    
+                await batch.commit();
+    
             } catch (error) {
                 console.error("Restore error:", error);
-                toast({ variant: 'destructive', title: 'Restore Failed', description: 'An error occurred during the restore process.' });
+                toast({ variant: 'destructive', title: 'Restore Failed', description: String(error) || 'An error occurred during the restore process.' });
             } finally {
                 await setDoc(statusDocRef, { isMaintenanceMode: false });
                 setIsRestoring(false);
                 setSelectedFile(null);
                 setSelectedUserId(null);
-                 if (restoreFileInputRef.current) {
+                if (restoreFileInputRef.current) {
                     restoreFileInputRef.current.value = '';
                 }
             }
