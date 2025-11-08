@@ -58,9 +58,10 @@ service cloud.firestore {
       /**
        * Rules for user notifications.
        * Users should be able to manage their notifications even if their account is expired.
+       * Admins should also be able to read user notifications.
        */
       match /notifications/{notificationId} {
-        // Users can read, update (to mark as read), list, and delete their own notifications.
+        // Users can read, update, list, and delete their own notifications. Admins have full access.
         allow read, write, list: if isOwner(userId) || isAdmin();
       }
 
