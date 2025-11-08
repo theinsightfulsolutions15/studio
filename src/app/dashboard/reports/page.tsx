@@ -424,24 +424,24 @@ function DailySummaryReport() {
         
         const sortedMovements = movements.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
-        const animalStateAtStart = new Map<string, 'in' | 'out'>();
+        let openingBalance = { male: 0, female: 0, '0-3yr': 0, '>3yr': 0 };
+        
+        const animalStateAtStart: { [key: string]: 'in' | 'out' } = {};
+
         animalsToProcess.forEach(animal => {
             const lastMovementBeforeStart = sortedMovements
                 .filter(m => m.animalId === animal.id && startOfDay(new Date(m.date)) < startDate)
                 .pop();
             
-            if (lastMovementBeforeStart) {
-                animalStateAtStart.set(animal.id, lastMovementBeforeStart.type === 'Entry' ? 'in' : 'out');
+            if (lastMovementBeforeStart && lastMovementBeforeStart.type === 'Entry') {
+                animalStateAtStart[animal.id] = 'in';
             } else {
-                 // If no movement history before start date, assume it's out.
-                animalStateAtStart.set(animal.id, 'out');
+                animalStateAtStart[animal.id] = 'out';
             }
         });
 
-
-        let openingBalance = { male: 0, female: 0, '0-3yr': 0, '>3yr': 0 };
-        animalStateAtStart.forEach((status, animalId) => {
-            if (status === 'in') {
+        Object.keys(animalStateAtStart).forEach(animalId => {
+            if (animalStateAtStart[animalId] === 'in') {
                 const animalDetails = animalMap.get(animalId);
                 if (animalDetails) {
                     const age = startDate.getFullYear() - animalDetails.yearOfBirth;
@@ -603,31 +603,25 @@ function DailySummaryReport() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead rowSpan={2}>Date</TableHead>
-                                <TableHead colSpan={4} className="text-center border-l border-r">Opening</TableHead>
-                                <TableHead colSpan={5} className="text-center border-r">In</TableHead>
-                                <TableHead colSpan={5} className="text-center border-r">Out</TableHead>
-                                <TableHead colSpan={4} className="text-center border-r">Closing</TableHead>
-                            </TableRow>
-                            <TableRow>
-                                <TableHead className="text-center border-l">M</TableHead>
-                                <TableHead className="text-center">F</TableHead>
-                                <TableHead className="text-center">0-3</TableHead>
-                                <TableHead className="text-center border-r">&gt;3</TableHead>
-                                <TableHead className="text-center">M</TableHead>
-                                <TableHead className="text-center">F</TableHead>
-                                <TableHead className="text-center">0-3</TableHead>
-                                <TableHead className="text-center">&gt;3</TableHead>
-                                <TableHead className="text-center border-r">Reasons</TableHead>
-                                <TableHead className="text-center">M</TableHead>
-                                <TableHead className="text-center">F</TableHead>
-                                <TableHead className="text-center">0-3</TableHead>
-                                <TableHead className="text-center">&gt;3</TableHead>
-                                <TableHead className="text-center border-r">Reasons</TableHead>
-                                <TableHead className="text-center">M</TableHead>
-                                <TableHead className="text-center">F</TableHead>
-                                <TableHead className="text-center">0-3</TableHead>
-                                <TableHead className="text-center border-r">&gt;3</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead className="text-center">Open M</TableHead>
+                                <TableHead className="text-center">Open F</TableHead>
+                                <TableHead className="text-center">Open 0-3</TableHead>
+                                <TableHead className="text-center">Open &gt;3</TableHead>
+                                <TableHead className="text-center">In M</TableHead>
+                                <TableHead className="text-center">In F</TableHead>
+                                <TableHead className="text-center">In 0-3</TableHead>
+                                <TableHead className="text-center">In &gt;3</TableHead>
+                                <TableHead>In Reasons</TableHead>
+                                <TableHead className="text-center">Out M</TableHead>
+                                <TableHead className="text-center">Out F</TableHead>
+                                <TableHead className="text-center">Out 0-3</TableHead>
+                                <TableHead className="text-center">Out &gt;3</TableHead>
+                                <TableHead>Out Reasons</TableHead>
+                                <TableHead className="text-center">Close M</TableHead>
+                                <TableHead className="text-center">Close F</TableHead>
+                                <TableHead className="text-center">Close 0-3</TableHead>
+                                <TableHead className="text-center">Close &gt;3</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -635,24 +629,24 @@ function DailySummaryReport() {
                             {!isLoading && dailySummaryData.map(row => (
                                 <TableRow key={row.date}>
                                     <TableCell>{row.date}</TableCell>
-                                    <TableCell className="text-center border-l">{row.openingMale}</TableCell>
+                                    <TableCell className="text-center">{row.openingMale}</TableCell>
                                     <TableCell className="text-center">{row.openingFemale}</TableCell>
                                     <TableCell className="text-center">{row.opening0_3yr}</TableCell>
-                                    <TableCell className="text-center border-r">{row.openingGt3yr}</TableCell>
+                                    <TableCell className="text-center">{row.openingGt3yr}</TableCell>
                                     <TableCell className="text-center">{row.inMale}</TableCell>
                                     <TableCell className="text-center">{row.inFemale}</TableCell>
                                     <TableCell className="text-center">{row.in0_3yr}</TableCell>
                                     <TableCell className="text-center">{row.inGt3yr}</TableCell>
-                                    <TableCell className="text-center border-r max-w-xs truncate">{row.inReasons}</TableCell>
+                                    <TableCell className="max-w-xs truncate">{row.inReasons}</TableCell>
                                     <TableCell className="text-center">{row.outMale}</TableCell>
                                     <TableCell className="text-center">{row.outFemale}</TableCell>
                                     <TableCell className="text-center">{row.out0_3yr}</TableCell>
                                     <TableCell className="text-center">{row.outGt3yr}</TableCell>
-                                    <TableCell className="text-center border-r max-w-xs truncate">{row.outReasons}</TableCell>
+                                    <TableCell className="max-w-xs truncate">{row.outReasons}</TableCell>
                                     <TableCell className="text-center">{row.closingMale}</TableCell>
                                     <TableCell className="text-center">{row.closingFemale}</TableCell>
                                     <TableCell className="text-center">{row.closing0_3yr}</TableCell>
-                                    <TableCell className="text-center border-r">{row.closingGt3yr}</TableCell>
+                                    <TableCell className="text-center">{row.closingGt3yr}</TableCell>
                                 </TableRow>
                             ))}
                             {!isLoading && dailySummaryData.length === 0 && (
@@ -711,5 +705,6 @@ export default function ReportsPage() {
     </div>
   );
 }
+
 
 
