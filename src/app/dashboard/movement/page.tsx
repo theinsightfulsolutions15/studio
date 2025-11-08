@@ -43,7 +43,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { MoreHorizontal, PlusCircle, ChevronsUpDown, Check, Search, Trash2 } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, doc } from 'firebase/firestore';
@@ -457,3 +457,5 @@ export default function MovementPage() {
     </>
   );
 }
+
+    
