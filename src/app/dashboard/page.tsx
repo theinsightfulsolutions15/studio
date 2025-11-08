@@ -2,7 +2,7 @@
 'use client';
 
 import { useAuth, useCollection, useMemoFirebase, useDoc, useFirestore } from '@/firebase';
-import { collection, collectionGroup, doc } from 'firebase/firestore';
+import { collection, doc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import type { Animal, MilkRecord, FinancialRecord } from '@/lib/types';
@@ -13,31 +13,24 @@ export default function Dashboard() {
 
   const userDocRef = useMemoFirebase(() => (user && firestore ? doc(firestore, `users/${user.uid}`) : null), [user, firestore]);
   const { data: userData } = useDoc(userDocRef);
-  const isAdmin = userData?.role === 'Admin';
 
-  // 🧠 Animals Query
+  // 🧠 Animals Query - always for the current user
   const animalsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return isAdmin
-      ? collectionGroup(firestore, 'animals')
-      : collection(firestore, `users/${user.uid}/animals`);
-  }, [firestore, user, isAdmin]);
+    return collection(firestore, `users/${user.uid}/animals`);
+  }, [firestore, user]);
 
-  // 🧠 Milk Records Query
+  // 🧠 Milk Records Query - always for the current user
   const milkRecordsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return isAdmin
-      ? collectionGroup(firestore, 'milk_records')
-      : collection(firestore, `users/${user.uid}/milk_records`);
-  }, [firestore, user, isAdmin]);
+    return collection(firestore, `users/${user.uid}/milk_records`);
+  }, [firestore, user]);
 
-  // 🧠 Financial Records Query
+  // 🧠 Financial Records Query - always for the current user
   const financialRecordsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return isAdmin
-      ? collectionGroup(firestore, 'financial_records')
-      : collection(firestore, `users/${user.uid}/financial_records`);
-  }, [firestore, user, isAdmin]);
+    return collection(firestore, `users/${user.uid}/financial_records`);
+  }, [firestore, user]);
 
   // ✅ useCollection को केवल तब चलाओ जब query valid हो
   const { data: animals, isLoading: isLoadingAnimals } = useCollection<Animal>(animalsQuery);
