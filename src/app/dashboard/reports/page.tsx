@@ -418,6 +418,8 @@ function DailySummaryReport() {
         const animalsToProcess = selectedAnimalType === 'All' 
             ? animals 
             : animals.filter(a => a.type === selectedAnimalType);
+        
+        const animalIdsToProcess = new Set(animalsToProcess.map(a => a.id));
 
         const startDate = startOfDay(dateRange.from);
         const endDate = dateRange.to ? startOfDay(dateRange.to) : startDate;
@@ -425,7 +427,10 @@ function DailySummaryReport() {
         const sortedMovements = movements.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
         let openingBalance = { male: 0, female: 0, '0-3yr': 0, '>3yr': 0 };
-        animalsToProcess.forEach(animal => {
+
+        animals.forEach(animal => {
+            if (!animalIdsToProcess.has(animal.id)) return;
+
             const lastMovementBeforeStart = sortedMovements
                 .filter(m => m.animalId === animal.id && startOfDay(new Date(m.date)) < startDate)
                 .pop();
@@ -445,10 +450,9 @@ function DailySummaryReport() {
         const reportData: DailySummaryRow[] = [];
 
         dateArray.forEach(currentDate => {
-            const animalsInScopeIds = new Set(animalsToProcess.map(a => a.id));
             const currentDayMovements = sortedMovements.filter(m => {
                 const isCorrectDate = startOfDay(new Date(m.date)).getTime() === currentDate.getTime();
-                return isCorrectDate && animalsInScopeIds.has(m.animalId);
+                return isCorrectDate && animalIdsToProcess.has(m.animalId);
             });
             
             const dailyIn = { male: 0, female: 0, '0-3yr': 0, '>3yr': 0, reasons: [] as string[] };
@@ -575,25 +579,31 @@ function DailySummaryReport() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="border-r">Date</TableHead>
-                                <TableHead>Open M</TableHead>
-                                <TableHead>Open F</TableHead>
-                                <TableHead>Open 0-3</TableHead>
-                                <TableHead className="border-r">Open &gt;3</TableHead>
-                                <TableHead>In M</TableHead>
-                                <TableHead>In F</TableHead>
-                                <TableHead>In 0-3</TableHead>
-                                <TableHead>In &gt;3</TableHead>
-                                <TableHead className="border-r">In Reasons</TableHead>
-                                <TableHead>Out M</TableHead>
-                                <TableHead>Out F</TableHead>
-                                <TableHead>Out 0-3</TableHead>
-                                <TableHead>Out &gt;3</TableHead>
-                                <TableHead className="border-r">Out Reasons</TableHead>
-                                <TableHead>Close M</TableHead>
-                                <TableHead>Close F</TableHead>
-                                <TableHead>Close 0-3</TableHead>
-                                <TableHead>Close &gt;3</TableHead>
+                                <TableHead rowSpan={2} className="text-left align-middle border-r min-w-[120px]">Date</TableHead>
+                                <TableHead colSpan={4} className="text-center border-r">OPENING</TableHead>
+                                <TableHead colSpan={5} className="text-center border-r">IN</TableHead>
+                                <TableHead colSpan={5} className="text-center border-r">OUT</TableHead>
+                                <TableHead colSpan={4} className="text-center">CLOSING</TableHead>
+                            </TableRow>
+                            <TableRow>
+                                <TableHead className="text-center">M</TableHead>
+                                <TableHead className="text-center">F</TableHead>
+                                <TableHead className="text-center">0-3</TableHead>
+                                <TableHead className="text-center border-r">&gt;3</TableHead>
+                                <TableHead className="text-center">M</TableHead>
+                                <TableHead className="text-center">F</TableHead>
+                                <TableHead className="text-center">0-3</TableHead>
+                                <TableHead className="text-center">&gt;3</TableHead>
+                                <TableHead className="text-center border-r">Reason</TableHead>
+                                <TableHead className="text-center">M</TableHead>
+                                <TableHead className="text-center">F</TableHead>
+                                <TableHead className="text-center">0-3</TableHead>
+                                <TableHead className="text-center">&gt;3</TableHead>
+                                <TableHead className="text-center border-r">Reason</TableHead>
+                                <TableHead className="text-center">M</TableHead>
+                                <TableHead className="text-center">F</TableHead>
+                                <TableHead className="text-center">0-3</TableHead>
+                                <TableHead className="text-center">&gt;3</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -926,16 +936,16 @@ function DetailedReport() {
         if (!animals || !movements) return [];
 
         const movementsMap = new Map<string, { entry?: AnimalMovement; exit?: AnimalMovement }>();
+        const animalsWithMovements = new Set<string>();
 
         movements.forEach(movement => {
+            animalsWithMovements.add(movement.animalId);
             const existing = movementsMap.get(movement.animalId) || {};
             if (movement.type === 'Entry') {
-                // Keep the earliest entry
                 if (!existing.entry || new Date(movement.date) < new Date(existing.entry.date)) {
                     existing.entry = movement;
                 }
-            } else { // 'Exit'
-                // Keep the latest exit
+            } else { 
                  if (!existing.exit || new Date(movement.date) > new Date(existing.exit.date)) {
                     existing.exit = movement;
                 }
@@ -943,24 +953,26 @@ function DetailedReport() {
             movementsMap.set(movement.animalId, existing);
         });
 
-        return animals.map(animal => {
-            const animalMovements = movementsMap.get(animal.id);
-            const age = new Date().getFullYear() - animal.yearOfBirth;
-            return {
-                ...animal,
-                age,
-                checkInDate: animalMovements?.entry ? format(new Date(animalMovements.entry.date), 'dd-MM-yyyy') : undefined,
-                checkOutDate: animalMovements?.exit ? format(new Date(animalMovements.exit.date), 'dd-MM-yyyy') : undefined,
-                checkOutReason: animalMovements?.exit?.reason,
-            };
+        return animals
+            .filter(animal => animalsWithMovements.has(animal.id))
+            .map(animal => {
+                const animalMovements = movementsMap.get(animal.id);
+                const age = new Date().getFullYear() - animal.yearOfBirth;
+                return {
+                    ...animal,
+                    age,
+                    checkInDate: animalMovements?.entry ? format(new Date(animalMovements.entry.date), 'dd-MM-yyyy') : undefined,
+                    checkOutDate: animalMovements?.exit ? format(new Date(animalMovements.exit.date), 'dd-MM-yyyy') : undefined,
+                    checkOutReason: animalMovements?.exit?.reason,
+                };
         });
     }, [animals, movements]);
 
     const isLoading = isLoadingAnimals || isLoadingMovements;
 
     const exportToExcel = () => {
-        const dataToExport = detailedReportData.map(row => ({
-            'S.N.': detailedReportData.indexOf(row) + 1,
+        const dataToExport = detailedReportData.map((row, index) => ({
+            'S.N.': index + 1,
             'CHECK IN DATE': row.checkInDate,
             'TAG NO.': row.govtTagNo,
             'TAG COLOR': row.tagColor,
