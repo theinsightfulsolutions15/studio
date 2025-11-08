@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, Sheet as ExcelIcon, Search } from 'lucide-react';
+import { FileText, Sheet as ExcelIcon, Search, Check, ChevronsUpDown } from 'lucide-react';
 import { DatePickerWithRange } from '@/components/date-picker-range';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -28,6 +28,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { DateRange } from 'react-day-picker';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 
 
 declare module 'jspdf' {
@@ -386,6 +388,8 @@ function DailySummaryReport() {
     const firestore = useFirestore();
     const { user } = useUser();
     const [dateRange, setDateRange] = useState<DateRange | undefined>({ from: subDays(new Date(), 7), to: new Date() });
+    const [selectedAnimalId, setSelectedAnimalId] = useState<string | 'All'>('All');
+    const [animalPopoverOpen, setAnimalPopoverOpen] = useState(false);
 
     const animalsQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
@@ -403,30 +407,31 @@ function DailySummaryReport() {
     const animalMap = useMemo(() => new Map(animals?.map(a => [a.id, a])), [animals]);
     
     const dailySummaryData = useMemo(() => {
-        if (!animals || !movements || !dateRange?.from) return [];
+        const animalsToProcess = selectedAnimalId === 'All' 
+            ? animals 
+            : animals?.filter(a => a.id === selectedAnimalId);
+
+        if (!animalsToProcess || !movements || !dateRange?.from) return [];
 
         const startDate = startOfDay(dateRange.from);
         const endDate = dateRange.to ? startOfDay(dateRange.to) : startDate;
         
         const sortedMovements = movements.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
-        // Correctly calculate the initial state of each animal before the start date
         const animalStateAtStart = new Map<string, 'in' | 'out'>();
-        animals.forEach(animal => {
+        animalsToProcess.forEach(animal => {
             const lastMovementBeforeStart = sortedMovements
                 .filter(m => m.animalId === animal.id && startOfDay(new Date(m.date)) < startDate)
-                .pop(); // Gets the last movement before the start date
+                .pop();
             
             if (lastMovementBeforeStart) {
                 animalStateAtStart.set(animal.id, lastMovementBeforeStart.type === 'Entry' ? 'in' : 'out');
             } else {
-                 // If no movement history before start date, it means the animal was not in the gaushala
                 animalStateAtStart.set(animal.id, 'out');
             }
         });
 
 
-        // Calculate opening balance based on the state at the start of the date range
         let openingBalance = { male: 0, female: 0, '0-3yr': 0, '>3yr': 0 };
         animalStateAtStart.forEach((status, animalId) => {
             if (status === 'in') {
@@ -447,11 +452,14 @@ function DailySummaryReport() {
         const reportData: DailySummaryRow[] = [];
 
         dateArray.forEach(currentDate => {
-            const currentDayMovements = sortedMovements.filter(m => startOfDay(new Date(m.date)).getTime() === currentDate.getTime());
+            const currentDayMovements = sortedMovements.filter(m => {
+                const isCorrectDate = startOfDay(new Date(m.date)).getTime() === currentDate.getTime();
+                const isCorrectAnimal = selectedAnimalId === 'All' || m.animalId === selectedAnimalId;
+                return isCorrectDate && isCorrectAnimal;
+            });
 
-            // Skip days with no movements
-            if (currentDayMovements.length === 0) {
-                return;
+            if (selectedAnimalId !== 'All' && currentDayMovements.length === 0) {
+                 return; // For single animal view, only show days with movements
             }
 
             const inMovements = currentDayMovements.filter(m => m.type === 'Entry');
@@ -492,34 +500,36 @@ function DailySummaryReport() {
                 '0-3yr': openingBalance['0-3yr'] + dailyIn['0-3yr'] - dailyOut['0-3yr'],
                 '>3yr': openingBalance['>3yr'] + dailyIn['>3yr'] - dailyOut['>3yr'],
             };
-
-            reportData.push({
-                date: format(currentDate, 'dd-MM-yyyy'),
-                openingMale: openingBalance.male,
-                openingFemale: openingBalance.female,
-                opening0_3yr: openingBalance['0-3yr'],
-                openingGt3yr: openingBalance['>3yr'],
-                inMale: dailyIn.male,
-                inFemale: dailyIn.female,
-                in0_3yr: dailyIn['0-3yr'],
-                inGt3yr: dailyIn['>3yr'],
-                inReasons: dailyIn.reasons.join(', '),
-                outMale: dailyOut.male,
-                outFemale: dailyOut.female,
-                out0_3yr: dailyOut['0-3yr'],
-                outGt3yr: dailyOut['>3yr'],
-                outReasons: dailyOut.reasons.join(', '),
-                closingMale: closingBalance.male,
-                closingFemale: closingBalance.female,
-                closing0_3yr: closingBalance['0-3yr'],
-                closingGt3yr: closingBalance['>3yr'],
-            });
+            
+            if (currentDayMovements.length > 0) {
+                reportData.push({
+                    date: format(currentDate, 'dd-MM-yyyy'),
+                    openingMale: openingBalance.male,
+                    openingFemale: openingBalance.female,
+                    opening0_3yr: openingBalance['0-3yr'],
+                    openingGt3yr: openingBalance['>3yr'],
+                    inMale: dailyIn.male,
+                    inFemale: dailyIn.female,
+                    in0_3yr: dailyIn['0-3yr'],
+                    inGt3yr: dailyIn['>3yr'],
+                    inReasons: dailyIn.reasons.join(', '),
+                    outMale: dailyOut.male,
+                    outFemale: dailyOut.female,
+                    out0_3yr: dailyOut['0-3yr'],
+                    outGt3yr: dailyOut['>3yr'],
+                    outReasons: dailyOut.reasons.join(', '),
+                    closingMale: closingBalance.male,
+                    closingFemale: closingBalance.female,
+                    closing0_3yr: closingBalance['0-3yr'],
+                    closingGt3yr: closingBalance['>3yr'],
+                });
+            }
 
             openingBalance = closingBalance;
         });
 
         return reportData;
-    }, [animals, movements, dateRange, animalMap]);
+    }, [animals, movements, dateRange, animalMap, selectedAnimalId]);
 
     const isLoading = isLoadingAnimals || isLoadingMovements;
 
@@ -557,6 +567,32 @@ function DailySummaryReport() {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <CardTitle>Daily Summary</CardTitle>
                     <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        <Popover open={animalPopoverOpen} onOpenChange={setAnimalPopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" className="w-full md:w-[200px] justify-between">
+                                    {selectedAnimalId === 'All' ? 'All Animals' : animals?.find(a => a.id === selectedAnimalId)?.govtTagNo || 'Select Animal...'}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                <Command>
+                                    <CommandInput placeholder="Search animal tag..." />
+                                    <CommandEmpty>No animals found.</CommandEmpty>
+                                    <CommandGroup>
+                                        <CommandItem key="all-animals" value="All Animals" onSelect={() => { setSelectedAnimalId('All'); setAnimalPopoverOpen(false); }}>
+                                            <Check className={cn("mr-2 h-4 w-4", selectedAnimalId === 'All' ? "opacity-100" : "opacity-0")} />
+                                            All Animals
+                                        </CommandItem>
+                                        {animals?.map(animal => (
+                                            <CommandItem key={animal.id} value={animal.govtTagNo} onSelect={() => { setSelectedAnimalId(animal.id); setAnimalPopoverOpen(false); }}>
+                                                <Check className={cn("mr-2 h-4 w-4", selectedAnimalId === animal.id ? "opacity-100" : "opacity-0")} />
+                                                {animal.govtTagNo}
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
                         <DatePickerWithRange date={dateRange} setDate={setDateRange} />
                         <div className="flex gap-2">
                            <Button variant="outline" size="icon" onClick={exportToExcel} disabled={isLoading || dailySummaryData.length === 0}><ExcelIcon className="h-4 w-4" /></Button>
@@ -678,3 +714,4 @@ export default function ReportsPage() {
     </div>
   );
 }
+
