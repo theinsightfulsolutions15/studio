@@ -62,6 +62,7 @@ export type NavItem = {
   title: string;
   icon: LucideIcon;
   label?: string;
+  id?: string;
 };
 
 export type AnimalMovement = {

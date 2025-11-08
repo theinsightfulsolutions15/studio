@@ -16,8 +16,9 @@ import {
   UserCheck,
   BookUser,
   BookCopy,
+  FileClock,
 } from 'lucide-react';
-import { doc } from 'firebase/firestore';
+import { doc, collection, query, where } from 'firebase/firestore';
 import {
   SidebarContent,
   SidebarMenu,
@@ -26,10 +27,11 @@ import {
   SidebarHeader,
   SidebarFooter,
   SidebarMenuSkeleton,
+  SidebarMenuBadge,
 } from '@/components/ui/sidebar';
-import type { NavItem, User as AppUser } from '@/lib/types';
+import type { NavItem, User as AppUser, AmcRenewal } from '@/lib/types';
 import Logo from './logo';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 
 const baseNavItems: NavItem[] = [
   { href: '/dashboard', title: 'Dashboard', icon: LayoutDashboard },
@@ -45,10 +47,14 @@ const masterNavItems: NavItem[] = [
     { href: '/dashboard/master/accounts', title: 'Accounts', icon: BookUser },
 ];
 
+const userNavItems: NavItem[] = [
+    { href: '/dashboard/renewal', title: 'AMC Renewal', icon: FileClock },
+];
+
 const adminNavItems: NavItem[] = [
     { href: '/dashboard/users', title: 'Users', icon: Users },
     { href: '/dashboard/user-approvals', title: 'User Approvals', icon: UserCheck },
-    { href: '/dashboard/amc', title: 'AMC Renewals', icon: ShieldCheck },
+    { href: '/dashboard/amc', title: 'AMC Renewals', icon: ShieldCheck, id: 'amc-renewals' },
 ];
 
 const settingsItem: NavItem = {
@@ -69,12 +75,21 @@ export default function Nav() {
 
   const { data: currentUser, isLoading: isCurrentUserLoading } = useDoc<AppUser>(userDocRef);
 
+  const isAdmin = currentUser?.role === 'Admin';
+  
+  const pendingRenewalsQuery = useMemoFirebase(() => {
+    if (!isAdmin || !firestore) return null;
+    return query(collection(firestore, 'amc_renewals'), where('status', '==', 'Pending'));
+  }, [isAdmin, firestore]);
+  
+  const { data: pendingRenewals } = useCollection<AmcRenewal>(pendingRenewalsQuery);
+  const pendingRenewalsCount = pendingRenewals?.length ?? 0;
+
   const isLoading = isUserLoading || isCurrentUserLoading;
 
-  const isAdmin = currentUser?.role === 'Admin';
-
-  const navItems = isAdmin ? [...baseNavItems, ...masterNavItems, ...adminNavItems] : [...baseNavItems, ...masterNavItems];
-
+  const navItems = isAdmin 
+    ? [...baseNavItems, ...masterNavItems, ...adminNavItems] 
+    : [...baseNavItems, ...masterNavItems, ...userNavItems];
 
   return (
     <>
@@ -102,6 +117,9 @@ export default function Nav() {
                   <span>{item.title}</span>
                 </Link>
               </SidebarMenuButton>
+              {item.id === 'amc-renewals' && pendingRenewalsCount > 0 && (
+                <SidebarMenuBadge>{pendingRenewalsCount}</SidebarMenuBadge>
+              )}
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
