@@ -38,6 +38,7 @@ function AnimalRegistryReport() {
     const firestore = useFirestore();
     const { user } = useUser();
 
+    const [typeFilter, setTypeFilter] = useState('All');
     const [breedFilter, setBreedFilter] = useState('All');
     const [colorFilter, setColorFilter] = useState('All');
     const [healthStatusFilter, setHealthStatusFilter] = useState('All');
@@ -53,6 +54,7 @@ function AnimalRegistryReport() {
     const filteredAnimals = useMemo(() => {
         if (!animals) return [];
         return animals.filter(animal => {
+            const typeMatch = typeFilter === 'All' || animal.type === typeFilter;
             const breedMatch = breedFilter === 'All' || animal.breed === breedFilter;
             const colorMatch = colorFilter === 'All' || animal.color === colorFilter;
             const healthStatusMatch = healthStatusFilter === 'All' || animal.healthStatus === healthStatusFilter;
@@ -64,10 +66,11 @@ function AnimalRegistryReport() {
                 (ageFilter === '6-10' && age >= 6 && age <= 10) ||
                 (ageFilter === '10+' && age > 10);
             
-            return breedMatch && colorMatch && healthStatusMatch && ageMatch;
+            return typeMatch && breedMatch && colorMatch && healthStatusMatch && ageMatch;
         });
-    }, [animals, breedFilter, colorFilter, healthStatusFilter, ageFilter]);
+    }, [animals, typeFilter, breedFilter, colorFilter, healthStatusFilter, ageFilter]);
     
+    const uniqueTypes = useMemo(() => ['All', ...Array.from(new Set(animals?.map(a => a.type)))], [animals]);
     const uniqueBreeds = useMemo(() => ['All', ...Array.from(new Set(animals?.map(a => a.breed)))], [animals]);
     const uniqueColors = useMemo(() => ['All', ...Array.from(new Set(animals?.map(a => a.color)))], [animals]);
     const uniqueHealthStatuses = ['All', 'Healthy', 'Sick', 'Under Treatment'];
@@ -124,7 +127,11 @@ function AnimalRegistryReport() {
                         <Button variant="outline" onClick={exportToPdf} disabled={isLoading || filteredAnimals.length === 0}><FileText className="mr-2 h-4 w-4" /> PDF</Button>
                     </div>
                 </div>
-                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
+                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4">
+                   <Select value={typeFilter} onValueChange={setTypeFilter}>
+                       <SelectTrigger><SelectValue placeholder="All Types" /></SelectTrigger>
+                       <SelectContent>{uniqueTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                   </Select>
                    <Select value={breedFilter} onValueChange={setBreedFilter}>
                        <SelectTrigger><SelectValue placeholder="All Breeds" /></SelectTrigger>
                        <SelectContent>{uniqueBreeds.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
