@@ -1,10 +1,8 @@
 
 'use client';
 
-import { useAuth } from '@/firebase/provider';
-import { useCollection } from '@/firebase/firestore/use-collection';
-import { useMemoFirebase } from '@/firebase';
-import { collection, collectionGroup } from 'firebase/firestore';
+import { useAuth, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+import { collection, collectionGroup, doc } from 'firebase/firestore';
 import { firebaseConfig } from '@/firebase/config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
