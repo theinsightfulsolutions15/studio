@@ -44,11 +44,12 @@ import { collection, doc, updateDoc, getDocs, query as firestoreQuery, where } f
 import type { User as AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { format } from 'date-fns';
+import { useRouter } from 'next/navigation';
 
 
 // Helper function to generate the next customer ID
@@ -98,6 +99,8 @@ export default function UsersPage() {
   const firestore = useFirestore();
   const { user: authUser, isUserLoading: isAuthUserLoading } = useUser();
   const { toast } = useToast();
+  const router = useRouter();
+
   const [isApproving, setIsApproving] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
   const [validityDate, setValidityDate] = useState<Date | undefined>();
@@ -119,6 +122,12 @@ export default function UsersPage() {
   }, [isAdmin, firestore]);
 
   const { data: users, isLoading: isLoadingUsers } = useCollection<AppUser>(usersCollection);
+
+  const dataToDisplay = useMemo(() => {
+    if(isAdmin) return users;
+    if(currentUser) return [currentUser];
+    return [];
+  }, [isAdmin, users, currentUser]);
 
 
   const handleApproveUser = async () => {
@@ -192,13 +201,18 @@ export default function UsersPage() {
       )
   }
   
-  if (!isAdmin) {
+  if (!isAdmin && !currentUser) {
+    // This state can happen briefly while currentUser is loading.
+    // Or if a non-admin user somehow has no user document.
     return (
         <Card>
             <CardHeader>
                 <CardTitle>Access Denied</CardTitle>
-                <CardDescription>You do not have permission to view this page.</CardDescription>
+                <CardDescription>You do not have permission to view this page or your user profile could not be loaded.</CardDescription>
             </CardHeader>
+             <CardContent>
+                <Button onClick={() => router.push('/dashboard')}>Go to Dashboard</Button>
+            </CardContent>
         </Card>
     );
   }
@@ -210,13 +224,15 @@ export default function UsersPage() {
       <CardHeader>
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>Manage user accounts and roles.</CardDescription>
+                <CardTitle>{isAdmin ? 'User Management' : 'My Profile'}</CardTitle>
+                <CardDescription>{isAdmin ? 'Manage user accounts and roles.' : 'View your profile details.'}</CardDescription>
             </div>
-            <Button disabled={!isAdmin}>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Invite User
-            </Button>
+            {isAdmin && (
+                <Button disabled={!isAdmin}>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Invite User
+                </Button>
+            )}
         </div>
       </CardHeader>
       <CardContent>
@@ -234,7 +250,7 @@ export default function UsersPage() {
           </TableHeader>
           <TableBody>
             {(isLoadingUsers) && Array.from({ length: 4 }).map((_, i) => <UserRowSkeleton key={i} />)}
-            {users?.map((user) => (
+            {dataToDisplay?.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>
                     <div className="flex items-center gap-3">
@@ -271,8 +287,8 @@ export default function UsersPage() {
                                 Approve User
                             </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem>Edit Role</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Deactivate User</DropdownMenuItem>
+                        <DropdownMenuItem disabled={!isAdmin}>Edit Role</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" disabled={!isAdmin}>Deactivate User</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -283,7 +299,7 @@ export default function UsersPage() {
       </CardContent>
        <CardFooter>
         <div className="text-xs text-muted-foreground">
-          Showing <strong>{users?.length ?? 0}</strong> of <strong>{users?.length ?? 0}</strong> users
+          Showing <strong>{dataToDisplay?.length ?? 0}</strong> of <strong>{dataToDisplay?.length ?? 0}</strong> users
         </div>
       </CardFooter>
     </Card>
