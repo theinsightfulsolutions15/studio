@@ -7,3 +7,5 @@ import { cn } from '@/lib/utils';
 export const Spinner = ({ className }: { className?: string }) => {
   return <Loader2 className={cn('animate-spin', className)} />;
 };
+
+    

@@ -43,6 +43,7 @@ import type { User as AppUser, Animal, AnimalMovement, FinancialRecord, MilkReco
 import * as XLSX from 'xlsx';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
 
 export default function SettingsPage() {
   const { user, isUserLoading, isAdmin } = useUser();
@@ -439,17 +440,25 @@ export default function SettingsPage() {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                    <div>
-                        <p className="font-medium">
-                            {isAdmin ? 'Create a Full System Backup' : 'Create a New Backup'}
-                        </p>
-                        <p className="text-sm text-muted-foreground">This will generate an Excel file with all relevant data.</p>
+                <div className="rounded-lg border p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="font-medium">
+                                {isAdmin ? 'Create a Full System Backup' : 'Create a New Backup'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">This will generate an Excel file with all relevant data.</p>
+                        </div>
+                        <Button variant="outline" onClick={handleBackup} disabled={isBackingUp || isLoading}>
+                            <Download className="mr-2 h-4 w-4" />
+                            {isBackingUp ? 'Backing up...' : (isAdmin ? 'Download Full Backup' : 'Download My Data')}
+                        </Button>
                     </div>
-                    <Button variant="outline" onClick={handleBackup} disabled={isBackingUp || isLoading}>
-                        <Download className="mr-2 h-4 w-4" />
-                        {isBackingUp ? 'Backing up...' : (isAdmin ? 'Download Full Backup' : 'Download My Data')}
-                    </Button>
+                     {isBackingUp && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
+                            <Spinner className="h-4 w-4" />
+                            <span>Backup in progress. This may take a few moments...</span>
+                        </div>
+                    )}
                 </div>
             </CardContent>
         </Card>
@@ -507,10 +516,18 @@ export default function SettingsPage() {
                             <Label htmlFor="restore-file">Backup File (.xlsx)</Label>
                             <Input id="restore-file" type="file" accept=".xlsx" ref={restoreFileInputRef} onChange={handleRestoreFileSelect} />
                         </div>
-                         <Button onClick={triggerRestore} disabled={isRestoring || !selectedFile || (restoreMode === 'user' && !selectedUserId)}>
-                            <DatabaseBackup className="mr-2 h-4 w-4" />
-                            {isRestoring ? 'Restoring...' : 'Restore Data'}
-                        </Button>
+                         <div>
+                            <Button onClick={triggerRestore} disabled={isRestoring || !selectedFile || (restoreMode === 'user' && !selectedUserId)}>
+                                <DatabaseBackup className="mr-2 h-4 w-4" />
+                                {isRestoring ? 'Restoring...' : 'Restore Data'}
+                            </Button>
+                             {isRestoring && (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
+                                    <Spinner className="h-4 w-4" />
+                                    <span>Restore in progress. Please do not navigate away. This may take several minutes...</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                 </CardContent>
@@ -571,5 +588,7 @@ export default function SettingsPage() {
     </>
   );
 }
+
+    
 
     
