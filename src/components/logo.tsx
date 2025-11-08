@@ -28,7 +28,7 @@ export default function Logo() {
         <CowIcon className="h-6 w-6" />
       </div>
       <span className="text-xl font-bold font-headline text-foreground">
-        GauRakshak
+        NANDI NET
       </span>
     </div>
   );

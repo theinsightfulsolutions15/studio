@@ -72,7 +72,7 @@ export default function LoginPage() {
             setIsVerifying(false);
         });
     }
-  }, [user, isUserLoading, auth, firestore, router]);
+  }, [user, isUserLoading, auth, firestore, router, toast]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +92,7 @@ export default function LoginPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
-          <p className="text-lg font-semibold">GauRakshak</p>
+          <p className="text-lg font-semibold">NANDI NET</p>
           <p className="text-muted-foreground">Loading, please wait...</p>
         </div>
       </div>

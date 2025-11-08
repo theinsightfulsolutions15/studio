@@ -244,10 +244,10 @@ export default function AnimalsPage() {
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Animals");
-    XLSX.writeFile(workbook, "Gaushala_Animals.xlsx");
+    XLSX.writeFile(workbook, "NANDI_NET_Animals.xlsx");
      toast({
         title: "Export Successful",
-        description: "Animal data has been exported to Gaushala_Animals.xlsx.",
+        description: "Animal data has been exported to NANDI_NET_Animals.xlsx.",
     });
   };
 
@@ -461,7 +461,7 @@ export default function AnimalsPage() {
   };
   
   const dialogDescriptions = {
-      create: 'Fill in the details below to add a new animal to the Gaushala records.',
+      create: 'Fill in the details below to add a new animal to the records.',
       edit: 'Update the details for this animal.',
       view: 'Viewing the details for this animal.'
   };
@@ -474,7 +474,7 @@ export default function AnimalsPage() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
                 <CardTitle>Animals</CardTitle>
-                <CardDescription>Manage and track all animals in the Gaushala.</CardDescription>
+                <CardDescription>Manage and track all animals.</CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                 <div className="relative flex-1 md:flex-initial">

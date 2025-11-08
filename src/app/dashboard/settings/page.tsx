@@ -234,7 +234,7 @@ export default function SettingsPage() {
                     }
                 }
             }
-             XLSX.writeFile(workbook, 'GauRakshak_Full_Backup.xlsx');
+             XLSX.writeFile(workbook, 'NANDI_NET_Full_Backup.xlsx');
 
         } else {
             const userDataToBackup = await fetchDataForUser(user.uid);
@@ -247,7 +247,7 @@ export default function SettingsPage() {
             XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userDataToBackup.milk_records), 'Milk_Records');
             XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userDataToBackup.accounts), 'Accounts');
 
-            XLSX.writeFile(workbook, `GauRakshak_MyData_Backup.xlsx`);
+            XLSX.writeFile(workbook, `NANDI_NET_MyData_Backup.xlsx`);
         }
 
         toast({ title: "Backup Successful", description: "Your data has been exported to an Excel file." });
@@ -636,5 +636,3 @@ export default function SettingsPage() {
     </>
   );
 }
-
-    
