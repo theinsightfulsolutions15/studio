@@ -455,6 +455,11 @@ function DailySummaryReport() {
         dateArray.forEach(currentDate => {
             const currentDayMovements = sortedMovements.filter(m => startOfDay(new Date(m.date)).getTime() === currentDate.getTime());
 
+            // Skip days with no movements
+            if (currentDayMovements.length === 0) {
+                return;
+            }
+
             const inMovements = currentDayMovements.filter(m => m.type === 'Entry');
             const outMovements = currentDayMovements.filter(m => m.type === 'Exit');
             
