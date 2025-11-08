@@ -83,9 +83,9 @@ export default function Nav() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {isLoading && Array.from({ length: 6 }).map((_, i) => (
+          {isLoading && Array.from({ length: 8 }).map((_, i) => (
              <SidebarMenuItem key={i}>
-                <SidebarMenuButton tooltip="Loading..." asChild>
+                <SidebarMenuButton tooltip="Loading...">
                     <div className="flex items-center gap-2 p-2">
                         <SidebarMenuSkeleton showIcon />
                     </div>
