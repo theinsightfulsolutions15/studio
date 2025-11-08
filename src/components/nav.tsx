@@ -25,6 +25,7 @@ import {
   SidebarMenuButton,
   SidebarHeader,
   SidebarFooter,
+  SidebarMenuSkeleton,
 } from '@/components/ui/sidebar';
 import type { NavItem, User as AppUser } from '@/lib/types';
 import Logo from './logo';
@@ -58,7 +59,7 @@ const settingsItem: NavItem = {
 
 export default function Nav() {
   const pathname = usePathname();
-  const { user: authUser } = useUser();
+  const { user: authUser, isUserLoading } = useUser();
   const firestore = useFirestore();
 
   const userDocRef = useMemoFirebase(() => {
@@ -66,7 +67,9 @@ export default function Nav() {
     return doc(firestore, 'users', authUser.uid);
   }, [authUser, firestore]);
 
-  const { data: currentUser, isLoading } = useDoc<AppUser>(userDocRef);
+  const { data: currentUser, isLoading: isCurrentUserLoading } = useDoc<AppUser>(userDocRef);
+
+  const isLoading = isUserLoading || isCurrentUserLoading;
 
   const isAdmin = currentUser?.role === 'Admin';
 
@@ -84,8 +87,7 @@ export default function Nav() {
              <SidebarMenuItem key={i}>
                 <SidebarMenuButton tooltip="Loading..." asChild>
                     <div className="flex items-center gap-2 p-2">
-                        <div className="h-4 w-4 bg-muted rounded" />
-                        <div className="h-4 w-20 bg-muted rounded" />
+                        <SidebarMenuSkeleton showIcon />
                     </div>
                 </SidebarMenuButton>
              </SidebarMenuItem>
@@ -94,7 +96,7 @@ export default function Nav() {
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild
-                isActive={pathname.startsWith(item.href)}
+                isActive={pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))}
                 tooltip={item.title}
               >
                 <Link href={item.href}>
