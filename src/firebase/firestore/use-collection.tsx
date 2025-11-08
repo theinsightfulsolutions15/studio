@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -21,7 +20,6 @@ export interface UseCollectionResult<T> {
   error: FirestoreError | Error | null;
 }
 
-// Internal Firestore query type for path extraction
 export interface InternalQuery extends Query<DocumentData> {
   _query: {
     path: {
@@ -32,19 +30,10 @@ export interface InternalQuery extends Query<DocumentData> {
   };
 }
 
-/**
- * A React hook to subscribe to a Firestore collection or query in real-time.
- *
- * IMPORTANT: The `memoizedTargetRefOrQuery` parameter MUST be memoized using `useMemo` or `useMemoFirebase`
- * to prevent re-subscribing on every render, which can lead to performance issues and infinite loops.
- *
- * @template T The expected type of the documents in the collection.
- * @param {CollectionReference<DocumentData> | Query<DocumentData> | null | undefined} memoizedTargetRefOrQuery - A memoized Firestore collection reference or query. The hook is inactive if this is null or undefined.
- * @returns {UseCollectionResult<T>} An object containing the real-time data, loading state, and any error.
- */
 export function useCollection<T = any>(
   memoizedTargetRefOrQuery:
-    | ((CollectionReference<DocumentData> | Query<DocumentData>))
+    | CollectionReference<DocumentData>
+    | Query<DocumentData>
     | null
     | undefined
 ): UseCollectionResult<T> {
@@ -53,8 +42,9 @@ export function useCollection<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
-    // If the ref is null or undefined, do nothing.
+    // ✅ If no query or ref provided, just skip
     if (!memoizedTargetRefOrQuery) {
+      console.warn('⚠️ Skipping useCollection — Firestore reference is null.');
       setData(null);
       setIsLoading(false);
       setError(null);
@@ -66,15 +56,14 @@ export function useCollection<T = any>(
       setError(null);
 
       const internalQuery = memoizedTargetRefOrQuery as InternalQuery;
-      // This is a reliable way to check for a collection group query.
       const isCollectionGroup = internalQuery?._query?.allDescendants === true;
 
       const path =
-        (memoizedTargetRefOrQuery as any).path || // For collection references
-        internalQuery?._query?.path?.canonicalString() || // For queries
-        ''; // Fallback to empty string
+        (memoizedTargetRefOrQuery as any).path ||
+        internalQuery?._query?.path?.canonicalString?.() ||
+        '';
 
-      // Path validation — only for normal collections
+      // 🧩 Path validation — only for normal collections
       if (!isCollectionGroup && (!path || path.trim() === '' || path === '/')) {
         console.error(
           '❌ Firestore path is empty or invalid — useCollection() requires a valid collection.'
@@ -84,7 +73,7 @@ export function useCollection<T = any>(
         return;
       }
 
-      // Firestore snapshot listener
+      // ✅ Firestore snapshot listener
       const unsubscribe = onSnapshot(
         memoizedTargetRefOrQuery,
         (snapshot: QuerySnapshot<DocumentData>) => {
@@ -103,7 +92,6 @@ export function useCollection<T = any>(
               ? `CollectionGroup(${internalQuery._query.path.toString()})`
               : path,
           });
-
           console.error('⚠️ Firestore Permission Error:', contextualError);
           setError(contextualError);
           setData(null);
@@ -112,7 +100,7 @@ export function useCollection<T = any>(
         }
       );
 
-      // Cleanup
+      // ✅ Cleanup on unmount
       return () => unsubscribe();
     } catch (err: any) {
       console.error('🔥 useCollection Internal Error:', err);
