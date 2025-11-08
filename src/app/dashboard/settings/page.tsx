@@ -22,19 +22,21 @@ import { Label } from '@/components/ui/label';
 import { Download, Camera, Upload } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, collection, getDocs, query } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useEffect, useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import type { User as AppUser } from '@/lib/types';
+import type { User as AppUser, Animal, AnimalMovement, FinancialRecord, MilkRecord, Account } from '@/lib/types';
+import * as XLSX from 'xlsx';
 
 export default function SettingsPage() {
-  const { user, isUserLoading } = useUser();
+  const { user, isUserLoading, isAdmin } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const [isBackingUp, setIsBackingUp] = useState(false);
 
   const userDocRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -146,6 +148,72 @@ export default function SettingsPage() {
       description: "Profile updated successfully.",
     });
   };
+
+  const fetchDataForUser = async (userId: string) => {
+    const collections = ['animals', 'movements', 'financial_records', 'milk_records', 'accounts'];
+    const user_data: { [key: string]: any[] } = {};
+
+    for (const col of collections) {
+      const colRef = collection(firestore, `users/${userId}/${col}`);
+      const snapshot = await getDocs(colRef);
+      user_data[col] = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+    return user_data;
+  };
+
+  const handleBackup = async () => {
+    if (!firestore || !user) {
+        toast({ variant: 'destructive', title: 'Backup Failed', description: 'Could not create backup.' });
+        return;
+    }
+    setIsBackingUp(true);
+
+    try {
+        const workbook = XLSX.utils.book_new();
+        
+        if (isAdmin) {
+            // Admin: Backup all users' data
+            const usersSnapshot = await getDocs(collection(firestore, 'users'));
+            const allUsers = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as AppUser));
+
+            // User Profiles Sheet
+            const usersSheet = XLSX.utils.json_to_sheet(allUsers);
+            XLSX.utils.book_append_sheet(workbook, usersSheet, 'All User Profiles');
+
+            for (const u of allUsers) {
+                const userData = await fetchDataForUser(u.id);
+                for (const [colName, data] of Object.entries(userData)) {
+                    if(data.length > 0) {
+                      const sheetName = `${u.customerId || u.id.substring(0,5)}_${colName}`.substring(0, 31);
+                      const sheet = XLSX.utils.json_to_sheet(data);
+                      XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+                    }
+                }
+            }
+             XLSX.writeFile(workbook, 'GauRakshak_Full_Backup.xlsx');
+
+        } else {
+            // Regular User: Backup own data
+            const userData = await fetchDataForUser(user.uid);
+
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userData.animals), 'Animals');
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userData.movements), 'Movements');
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userData.financial_records), 'Financial_Records');
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userData.milk_records), 'Milk_Records');
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userData.accounts), 'Accounts');
+
+            XLSX.writeFile(workbook, `GauRakshak_MyData_Backup.xlsx`);
+        }
+
+        toast({ title: "Backup Successful", description: "Your data has been exported to an Excel file." });
+
+    } catch (error) {
+        console.error("Backup error:", error);
+        toast({ variant: 'destructive', title: 'Backup Failed', description: 'An error occurred while creating the backup.' });
+    } finally {
+        setIsBackingUp(false);
+    }
+  };
   
   const isLoading = isUserLoading || isUserDocLoading;
 
@@ -224,17 +292,21 @@ export default function SettingsPage() {
         <Card>
             <CardHeader>
                 <CardTitle>Data Backup</CardTitle>
-                <CardDescription>Securely back up all your application data.</CardDescription>
+                <CardDescription>
+                    {isAdmin ? 'Download a complete backup of all data in the system.' : 'Securely back up all your personal application data.'}
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="flex items-center justify-between rounded-lg border p-4">
                     <div>
-                        <p className="font-medium">Create a new backup</p>
-                        <p className="text-sm text-muted-foreground">Last backup: 2024-05-15</p>
+                        <p className="font-medium">
+                            {isAdmin ? 'Create a Full System Backup' : 'Create a New Backup'}
+                        </p>
+                        <p className="text-sm text-muted-foreground">This will generate an Excel file with all relevant data.</p>
                     </div>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={handleBackup} disabled={isBackingUp || isLoading}>
                         <Download className="mr-2 h-4 w-4" />
-                        Download Full Backup
+                        {isBackingUp ? 'Backing up...' : (isAdmin ? 'Download Full Backup' : 'Download My Data')}
                     </Button>
                 </div>
             </CardContent>
@@ -275,3 +347,5 @@ export default function SettingsPage() {
     </>
   );
 }
+
+    
