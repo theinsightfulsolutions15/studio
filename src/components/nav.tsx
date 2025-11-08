@@ -85,11 +85,9 @@ export default function Nav() {
         <SidebarMenu>
           {isLoading && Array.from({ length: 8 }).map((_, i) => (
              <SidebarMenuItem key={i}>
-                <SidebarMenuButton tooltip="Loading...">
-                    <div className="flex items-center gap-2 p-2">
-                        <SidebarMenuSkeleton showIcon />
-                    </div>
-                </SidebarMenuButton>
+                <div className="flex items-center gap-2 p-2 h-8 w-full">
+                    <SidebarMenuSkeleton showIcon />
+                </div>
              </SidebarMenuItem>
           ))}
           {!isLoading && navItems.map((item) => (
