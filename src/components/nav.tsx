@@ -53,7 +53,7 @@ const userNavItems: NavItem[] = [
 
 const adminNavItems: NavItem[] = [
     { href: '/dashboard/users', title: 'Users', icon: Users },
-    { href: '/dashboard/user-approvals', title: 'User Approvals', icon: UserCheck },
+    { href: '/dashboard/user-approvals', title: 'User Approvals', icon: UserCheck, id: 'user-approvals' },
     { href: '/dashboard/amc', title: 'AMC Renewals', icon: ShieldCheck, id: 'amc-renewals' },
 ];
 
@@ -84,6 +84,14 @@ export default function Nav() {
   
   const { data: pendingRenewals } = useCollection<AmcRenewal>(pendingRenewalsQuery);
   const pendingRenewalsCount = pendingRenewals?.length ?? 0;
+
+  const pendingUsersQuery = useMemoFirebase(() => {
+    if (!isAdmin || !firestore) return null;
+    return query(collection(firestore, 'users'), where('status', '==', 'Pending'));
+  }, [isAdmin, firestore]);
+  const { data: pendingUsers } = useCollection<AppUser>(pendingUsersQuery);
+  const pendingUsersCount = pendingUsers?.length ?? 0;
+
 
   const isLoading = isUserLoading || isCurrentUserLoading;
 
@@ -119,6 +127,9 @@ export default function Nav() {
               </SidebarMenuButton>
               {item.id === 'amc-renewals' && pendingRenewalsCount > 0 && (
                 <SidebarMenuBadge>{pendingRenewalsCount}</SidebarMenuBadge>
+              )}
+              {item.id === 'user-approvals' && pendingUsersCount > 0 && (
+                <SidebarMenuBadge>{pendingUsersCount}</SidebarMenuBadge>
               )}
             </SidebarMenuItem>
           ))}
