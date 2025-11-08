@@ -410,41 +410,35 @@ function DailySummaryReport() {
         
         const sortedMovements = movements.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
-        // Calculate initial opening balance for the first day of the range
+        // Correctly calculate the initial state of each animal before the start date
+        const animalStateAtStart = new Map<string, 'in' | 'out'>();
+        animals.forEach(animal => {
+            const lastMovementBeforeStart = sortedMovements
+                .filter(m => m.animalId === animal.id && startOfDay(new Date(m.date)) < startDate)
+                .pop(); // Gets the last movement before the start date
+            
+            if (lastMovementBeforeStart) {
+                animalStateAtStart.set(animal.id, lastMovementBeforeStart.type === 'Entry' ? 'in' : 'out');
+            } else {
+                 // If no movement history before start date, it means the animal was not in the gaushala
+                animalStateAtStart.set(animal.id, 'out');
+            }
+        });
+
+
+        // Calculate opening balance based on the state at the start of the date range
         let openingBalance = { male: 0, female: 0, '0-3yr': 0, '>3yr': 0 };
-        const animalInitialState = new Map<string, { gender: 'Male' | 'Female'; age: number }>();
-        animals.forEach(animal => {
-            const age = startDate.getFullYear() - animal.yearOfBirth;
-            animalInitialState.set(animal.id, { gender: animal.gender, age });
-        });
+        animalStateAtStart.forEach((status, animalId) => {
+            if (status === 'in') {
+                const animalDetails = animalMap.get(animalId);
+                if (animalDetails) {
+                    const age = startDate.getFullYear() - animalDetails.yearOfBirth;
+                    if (animalDetails.gender === 'Male') openingBalance.male++;
+                    else openingBalance.female++;
 
-        const animalsPresentAtStart = new Set<string>();
-
-        // Consider animals without any movements before the start date as present from the beginning
-        const animalsWithMovements = new Set(movements.map(m => m.animalId));
-        animals.forEach(animal => {
-            if (!animalsWithMovements.has(animal.id)) {
-                animalsPresentAtStart.add(animal.id);
-            }
-        });
-        
-        sortedMovements.forEach(m => {
-            const movementDate = startOfDay(new Date(m.date));
-            if (movementDate < startDate) {
-                if (m.type === 'Entry') animalsPresentAtStart.add(m.animalId);
-                if (m.type === 'Exit') animalsPresentAtStart.delete(m.animalId);
-            }
-        });
-        
-        animalsPresentAtStart.forEach(animalId => {
-            const animalDetails = animalMap.get(animalId);
-            if (animalDetails) {
-                const age = startDate.getFullYear() - animalDetails.yearOfBirth;
-                if (animalDetails.gender === 'Male') openingBalance.male++;
-                else openingBalance.female++;
-
-                if (age <= 3) openingBalance['0-3yr']++;
-                else openingBalance['>3yr']++;
+                    if (age <= 3) openingBalance['0-3yr']++;
+                    else openingBalance['>3yr']++;
+                }
             }
         });
 
