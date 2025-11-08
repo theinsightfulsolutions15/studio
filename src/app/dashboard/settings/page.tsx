@@ -149,6 +149,14 @@ export default function SettingsPage() {
     });
   };
 
+  const cleanDataForExport = (data: any[], fieldsToRemove: string[]) => {
+    return data.map(item => {
+        const newItem = { ...item };
+        fieldsToRemove.forEach(field => delete newItem[field]);
+        return newItem;
+    });
+  };
+
   const fetchDataForUser = async (userId: string) => {
     const collections = ['animals', 'movements', 'financial_records', 'milk_records', 'accounts'];
     const user_data: { [key: string]: any[] } = {};
@@ -176,8 +184,9 @@ export default function SettingsPage() {
             const usersSnapshot = await getDocs(collection(firestore, 'users'));
             const allUsers = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as AppUser));
 
-            // User Profiles Sheet
-            const usersSheet = XLSX.utils.json_to_sheet(allUsers);
+            // User Profiles Sheet (excluding photoURL)
+            const cleanedUsers = cleanDataForExport(allUsers, ['photoURL']);
+            const usersSheet = XLSX.utils.json_to_sheet(cleanedUsers);
             XLSX.utils.book_append_sheet(workbook, usersSheet, 'All User Profiles');
 
             for (const u of allUsers) {
@@ -185,7 +194,11 @@ export default function SettingsPage() {
                 for (const [colName, data] of Object.entries(userData)) {
                     if(data.length > 0) {
                       const sheetName = `${u.customerId || u.id.substring(0,5)}_${colName}`.substring(0, 31);
-                      const sheet = XLSX.utils.json_to_sheet(data);
+                      let cleanedData = data;
+                      if(colName === 'animals'){
+                          cleanedData = cleanDataForExport(data, ['imageUrl']);
+                      }
+                      const sheet = XLSX.utils.json_to_sheet(cleanedData);
                       XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
                     }
                 }
@@ -195,8 +208,10 @@ export default function SettingsPage() {
         } else {
             // Regular User: Backup own data
             const userData = await fetchDataForUser(user.uid);
+            
+            const cleanedAnimals = cleanDataForExport(userData.animals, ['imageUrl']);
 
-            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userData.animals), 'Animals');
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(cleanedAnimals), 'Animals');
             XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userData.movements), 'Movements');
             XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userData.financial_records), 'Financial_Records');
             XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userData.milk_records), 'Milk_Records');
