@@ -16,36 +16,50 @@ import {
   DialogTitle,
   DialogFooter
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Download, Camera, Upload } from 'lucide-react';
+import { Download, Camera, Upload, DatabaseBackup } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, collection, getDocs, query } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection, getDocs, query, writeBatch, documentId, where } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { User as AppUser, Animal, AnimalMovement, FinancialRecord, MilkRecord, Account } from '@/lib/types';
 import * as XLSX from 'xlsx';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { user, isUserLoading, isAdmin } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  
+  // Backup State
   const [isBackingUp, setIsBackingUp] = useState(false);
 
-  const userDocRef = useMemoFirebase(() => {
-    if (!user) return null;
-    return doc(firestore, `users/${user.uid}`);
-  }, [user, firestore]);
-  
+  // Restore State
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreMode, setRestoreMode] = useState<'full' | 'user'>('full');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [isRestoreAlertOpen, setIsRestoreAlertOpen] = useState(false);
+  const restoreFileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: userData, isLoading: isUserDocLoading } = useDoc<AppUser>(userDocRef);
-  
   // User Profile state
   const [displayName, setDisplayName] = useState('');
   const [address, setAddress] = useState('');
@@ -57,6 +71,20 @@ export default function SettingsPage() {
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  const userDocRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(firestore, `users/${user.uid}`);
+  }, [user, firestore]);
+  
+  const { data: userData, isLoading: isUserDocLoading } = useDoc<AppUser>(userDocRef);
+
+  const allUsersCollection = useMemoFirebase(() => {
+      if (!isAdmin || !firestore) return null;
+      return collection(firestore, 'users');
+  }, [isAdmin, firestore]);
+  const { data: allUsers, isLoading: isLoadingAllUsers } = useCollection<AppUser>(allUsersCollection);
+  
 
   useEffect(() => {
     if (userData) {
@@ -180,18 +208,16 @@ export default function SettingsPage() {
         const workbook = XLSX.utils.book_new();
         
         if (isAdmin) {
-            // Admin: Backup all users' data
             const usersSnapshot = await getDocs(collection(firestore, 'users'));
-            const allUsers = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as AppUser));
+            const allUsersToBackup = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as AppUser));
 
-            // User Profiles Sheet (excluding photoURL)
-            const cleanedUsers = cleanDataForExport(allUsers, ['photoURL']);
+            const cleanedUsers = cleanDataForExport(allUsersToBackup, ['photoURL']);
             const usersSheet = XLSX.utils.json_to_sheet(cleanedUsers);
             XLSX.utils.book_append_sheet(workbook, usersSheet, 'All User Profiles');
 
-            for (const u of allUsers) {
-                const userData = await fetchDataForUser(u.id);
-                for (const [colName, data] of Object.entries(userData)) {
+            for (const u of allUsersToBackup) {
+                const userDataToBackup = await fetchDataForUser(u.id);
+                for (const [colName, data] of Object.entries(userDataToBackup)) {
                     if(data.length > 0) {
                       const sheetName = `${u.customerId || u.id.substring(0,5)}_${colName}`.substring(0, 31);
                       let cleanedData = data;
@@ -206,16 +232,15 @@ export default function SettingsPage() {
              XLSX.writeFile(workbook, 'GauRakshak_Full_Backup.xlsx');
 
         } else {
-            // Regular User: Backup own data
-            const userData = await fetchDataForUser(user.uid);
+            const userDataToBackup = await fetchDataForUser(user.uid);
             
-            const cleanedAnimals = cleanDataForExport(userData.animals, ['imageUrl']);
+            const cleanedAnimals = cleanDataForExport(userDataToBackup.animals, ['imageUrl']);
 
             XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(cleanedAnimals), 'Animals');
-            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userData.movements), 'Movements');
-            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userData.financial_records), 'Financial_Records');
-            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userData.milk_records), 'Milk_Records');
-            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userData.accounts), 'Accounts');
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userDataToBackup.movements), 'Movements');
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userDataToBackup.financial_records), 'Financial_Records');
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userDataToBackup.milk_records), 'Milk_Records');
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userDataToBackup.accounts), 'Accounts');
 
             XLSX.writeFile(workbook, `GauRakshak_MyData_Backup.xlsx`);
         }
@@ -230,6 +255,108 @@ export default function SettingsPage() {
     }
   };
   
+    const handleRestoreFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            setSelectedFile(file);
+        }
+    };
+    
+    const triggerRestore = () => {
+        if (!selectedFile) {
+            toast({ variant: 'destructive', title: 'No File Selected', description: 'Please select a backup file to restore.' });
+            return;
+        }
+        if (restoreMode === 'user' && !selectedUserId) {
+            toast({ variant: 'destructive', title: 'No User Selected', description: 'Please select a user to restore data for.' });
+            return;
+        }
+        setIsRestoreAlertOpen(true);
+    };
+
+    const handleConfirmRestore = async () => {
+        if (!firestore || !selectedFile || !isAdmin) return;
+
+        setIsRestoring(true);
+        setIsRestoreAlertOpen(false);
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                if (restoreMode === 'full') {
+                    // Full Restore Logic
+                    const batch = writeBatch(firestore);
+                    for (const sheetName of workbook.SheetNames) {
+                        const worksheet = workbook.Sheets[sheetName];
+                        const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+                        if (sheetName === 'All User Profiles') {
+                             for (const record of jsonData) {
+                                const docRef = doc(firestore, 'users', record.id);
+                                batch.set(docRef, record);
+                            }
+                        } else {
+                            const [userIdentifier, ...collectionParts] = sheetName.split('_');
+                            const collectionName = collectionParts.join('_');
+                            
+                            const user = allUsers?.find(u => u.customerId === userIdentifier || u.id.substring(0,5) === userIdentifier);
+                            if (user) {
+                                for (const record of jsonData) {
+                                    const docRef = doc(firestore, `users/${user.id}/${collectionName}`, record.id);
+                                    batch.set(docRef, record);
+                                }
+                            }
+                        }
+                    }
+                    await batch.commit();
+                    toast({ title: 'Full Restore Successful', description: 'All data has been restored from the backup.' });
+                } else if (restoreMode === 'user' && selectedUserId) {
+                    // User-wise Restore Logic
+                     const selectedUser = allUsers?.find(u => u.id === selectedUserId);
+                     if (!selectedUser) {
+                        toast({ variant: 'destructive', title: 'Restore Failed', description: 'Selected user not found.' });
+                        setIsRestoring(false);
+                        return;
+                     }
+                     const userIdentifier = selectedUser.customerId || selectedUser.id.substring(0,5);
+                     
+                     const batch = writeBatch(firestore);
+
+                     for (const sheetName of workbook.SheetNames) {
+                        if (sheetName.startsWith(userIdentifier)) {
+                           const [, ...collectionParts] = sheetName.split('_');
+                           const collectionName = collectionParts.join('_');
+                           const worksheet = workbook.Sheets[sheetName];
+                           const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+                            for (const record of jsonData) {
+                                const docRef = doc(firestore, `users/${selectedUserId}/${collectionName}`, record.id);
+                                batch.set(docRef, record);
+                            }
+                        }
+                     }
+                    await batch.commit();
+                    toast({ title: 'User Restore Successful', description: `Data for ${selectedUser.name} has been restored.` });
+                }
+            } catch (error) {
+                console.error("Restore error:", error);
+                toast({ variant: 'destructive', title: 'Restore Failed', description: 'An error occurred during the restore process.' });
+            } finally {
+                setIsRestoring(false);
+                setSelectedFile(null);
+                setSelectedUserId(null);
+                 if (restoreFileInputRef.current) {
+                    restoreFileInputRef.current.value = '';
+                }
+            }
+        };
+        reader.readAsArrayBuffer(selectedFile);
+    };
+
+
   const isLoading = isUserLoading || isUserDocLoading;
 
   return (
@@ -326,6 +453,69 @@ export default function SettingsPage() {
                 </div>
             </CardContent>
         </Card>
+
+        {isAdmin && (
+             <Card>
+                <CardHeader>
+                    <CardTitle>Data Restore</CardTitle>
+                    <CardDescription>
+                        Restore data from an Excel backup file. This is a highly destructive operation.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                     <div className="rounded-lg border border-destructive/50 p-4 bg-destructive/10">
+                        <AlertTitle className="text-destructive font-semibold">Warning: Destructive Action</AlertTitle>
+                        <AlertDescription className="text-destructive/90">
+                           Restoring data will permanently overwrite existing data. This action cannot be undone. 
+                           Proceed with extreme caution.
+                        </AlertDescription>
+                    </div>
+
+                    <div className="space-y-4 rounded-lg border p-4">
+                         <div className="grid md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Restore Mode</Label>
+                                 <Select value={restoreMode} onValueChange={(v: 'full' | 'user') => setRestoreMode(v)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select restore mode" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="full">Full Data Restore</SelectItem>
+                                        <SelectItem value="user">User-wise Restore</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                             {restoreMode === 'user' && (
+                                <div className="space-y-2">
+                                    <Label>Select User</Label>
+                                    <Select onValueChange={setSelectedUserId} value={selectedUserId || undefined} disabled={isLoadingAllUsers}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select a user to restore..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {isLoadingAllUsers && <SelectItem value="loading" disabled>Loading users...</SelectItem>}
+                                            {allUsers?.map(u => (
+                                                <SelectItem key={u.id} value={u.id}>{u.name} ({u.customerId || u.email})</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                         </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="restore-file">Backup File (.xlsx)</Label>
+                            <Input id="restore-file" type="file" accept=".xlsx" ref={restoreFileInputRef} onChange={handleRestoreFileSelect} />
+                        </div>
+                         <Button onClick={triggerRestore} disabled={isRestoring || !selectedFile || (restoreMode === 'user' && !selectedUserId)}>
+                            <DatabaseBackup className="mr-2 h-4 w-4" />
+                            {isRestoring ? 'Restoring...' : 'Restore Data'}
+                        </Button>
+                    </div>
+
+                </CardContent>
+            </Card>
+        )}
     </div>
 
      <Dialog open={isCaptureDialogOpen} onOpenChange={setIsCaptureDialogOpen}>
@@ -359,6 +549,25 @@ export default function SettingsPage() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    
+     <AlertDialog open={isRestoreAlertOpen} onOpenChange={setIsRestoreAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This will permanently overwrite the database with data from the backup file. 
+                    {restoreMode === 'user' && selectedUserId && `Only data for the user "${allUsers?.find(u => u.id === selectedUserId)?.name}" will be affected.`}
+                    This action is irreversible.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setIsRestoring(false)}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmRestore} className={cn(buttonVariants({ variant: "destructive" }))}>
+                    {isRestoring ? 'Restoring...' : 'Yes, Restore Data'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
