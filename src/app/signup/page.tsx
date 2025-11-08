@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import Logo from "@/components/logo";
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, writeBatch, setDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 
 export default function SignupPage() {
@@ -37,9 +37,8 @@ export default function SignupPage() {
       const user = userCredential.user;
 
       const isAdmin = email.toLowerCase() === 'theinsightfulsolutions@gmail.com';
-      const batch = writeBatch(firestore);
-
-      // 2. Prepare user document
+      
+      // 2. Create user document
       const userRef = doc(firestore, 'users', user.uid);
       const userData = {
         id: user.uid,
@@ -53,29 +52,15 @@ export default function SignupPage() {
         customerId: isAdmin ? 'G-001' : '', 
         validityDate: isAdmin ? '2099-12-31' : '',
       };
-      batch.set(userRef, userData);
+      await setDoc(userRef, userData);
 
-      // 3. Prepare admin-specific documents if applicable
+      // 3. Create admin role if applicable
       if (isAdmin) {
         const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
-        batch.set(adminRoleRef, { uid: user.uid });
-      } else {
-        // Create a notification for admins about the new user
-        const adminNotifRef = doc(collection(firestore, 'admin_notifications'));
-        batch.set(adminNotifRef, {
-            title: "New User Registration",
-            description: `${fullName} has registered and is waiting for approval.`,
-            createdAt: serverTimestamp(),
-            read: false,
-            href: '/dashboard/user-approvals',
-            icon: 'UserCheck',
-        });
+        await setDoc(adminRoleRef, { uid: user.uid });
       }
       
-      // 4. Commit the batch
-      await batch.commit();
-      
-      // 5. Show appropriate toast message and redirect
+      // 4. Show appropriate toast message and redirect
       if (isAdmin) {
         toast({
           title: "Admin Account Created",

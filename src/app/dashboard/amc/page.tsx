@@ -109,15 +109,6 @@ export default function AmcRenewalsPage() {
         status: 'Approved',
       });
       
-      const notificationRef = doc(collection(firestore, `users/${selectedRenewal.userId}/notifications`));
-      batch.set(notificationRef, {
-        title: "AMC Renewal Approved",
-        description: `Your subscription has been extended until ${format(newValidityDate, 'dd/MM/yyyy')}.`,
-        createdAt: serverTimestamp(),
-        read: false,
-        icon: 'ShieldCheck',
-      });
-      
       await batch.commit();
 
       toast({
