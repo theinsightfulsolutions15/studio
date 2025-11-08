@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import {
@@ -74,11 +75,11 @@ function AnimalRegistryReport() {
         });
     }, [animals, typeFilter, breedFilter, colorFilter, healthStatusFilter, ageFilter]);
     
-    const uniqueTypes = useMemo(() => ['All', ...Array.from(new Set(animals?.map(a => a.type)))], [animals]);
-    const uniqueBreeds = useMemo(() => ['All', ...Array.from(new Set(animals?.map(a => a.breed)))], [animals]);
-    const uniqueColors = useMemo(() => ['All', ...Array.from(new Set(animals?.map(a => a.color)))], [animals]);
-    const uniqueHealthStatuses = ['All', 'Healthy', 'Sick', 'Under Treatment'];
-    const ageRanges = ['All', '0-2', '3-5', '6-10', '10+'];
+    const uniqueTypes = useMemo(() => ['All Types', ...Array.from(new Set(animals?.map(a => a.type)))], [animals]);
+    const uniqueBreeds = useMemo(() => ['All Breeds', ...Array.from(new Set(animals?.map(a => a.breed)))], [animals]);
+    const uniqueColors = useMemo(() => ['All Colors', ...Array.from(new Set(animals?.map(a => a.color)))], [animals]);
+    const uniqueHealthStatuses = ['All Health Statuses', 'Healthy', 'Sick', 'Under Treatment'];
+    const ageRanges = ['All Ages', '0-2', '3-5', '6-10', '10+'];
 
     const exportToExcel = () => {
         const dataToExport = filteredAnimals.map(animal => ({
@@ -134,23 +135,23 @@ function AnimalRegistryReport() {
                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4">
                    <Select value={typeFilter} onValueChange={setTypeFilter}>
                        <SelectTrigger><SelectValue placeholder="All Types" /></SelectTrigger>
-                       <SelectContent>{uniqueTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                       <SelectContent>{uniqueTypes.map(t => <SelectItem key={t} value={t === 'All Types' ? 'All' : t}>{t}</SelectItem>)}</SelectContent>
                    </Select>
                    <Select value={breedFilter} onValueChange={setBreedFilter}>
                        <SelectTrigger><SelectValue placeholder="All Breeds" /></SelectTrigger>
-                       <SelectContent>{uniqueBreeds.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
+                       <SelectContent>{uniqueBreeds.map(b => <SelectItem key={b} value={b === 'All Breeds' ? 'All' : b}>{b}</SelectItem>)}</SelectContent>
                    </Select>
                    <Select value={colorFilter} onValueChange={setColorFilter}>
                        <SelectTrigger><SelectValue placeholder="All Colors" /></SelectTrigger>
-                       <SelectContent>{uniqueColors.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                       <SelectContent>{uniqueColors.map(c => <SelectItem key={c} value={c === 'All Colors' ? 'All' : c}>{c}</SelectItem>)}</SelectContent>
                    </Select>
                    <Select value={healthStatusFilter} onValueChange={setHealthStatusFilter}>
                        <SelectTrigger><SelectValue placeholder="All Health Statuses" /></SelectTrigger>
-                       <SelectContent>{uniqueHealthStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                       <SelectContent>{uniqueHealthStatuses.map(s => <SelectItem key={s} value={s === 'All Health Statuses' ? 'All' : s}>{s}</SelectItem>)}</SelectContent>
                    </Select>
                    <Select value={ageFilter} onValueChange={setAgeFilter}>
                        <SelectTrigger><SelectValue placeholder="All Ages" /></SelectTrigger>
-                       <SelectContent>{ageRanges.map(a => <SelectItem key={a} value={a}>{a === '10+' ? '> 10 Years' : a === 'All' ? 'All Ages' : `${a} Years`}</SelectItem>)}</SelectContent>
+                       <SelectContent>{ageRanges.map(a => <SelectItem key={a} value={a === 'All Ages' ? 'All' : a}>{a === '10+' ? '> 10 Years' : a === 'All' ? 'All Ages' : `${a} Years`}</SelectItem>)}</SelectContent>
                    </Select>
                 </div>
             </CardHeader>
@@ -388,7 +389,7 @@ function DailySummaryReport() {
     const firestore = useFirestore();
     const { user } = useUser();
     const [dateRange, setDateRange] = useState<DateRange | undefined>({ from: subDays(new Date(), 7), to: new Date() });
-    const [selectedAnimalId, setSelectedAnimalId] = useState<string | 'All'>('All');
+    const [selectedAnimalType, setSelectedAnimalType] = useState<string | 'All'>('All');
     const [animalPopoverOpen, setAnimalPopoverOpen] = useState(false);
 
     const animalsQuery = useMemoFirebase(() => {
@@ -404,12 +405,17 @@ function DailySummaryReport() {
     const { data: animals, isLoading: isLoadingAnimals } = useCollection<Animal>(animalsQuery);
     const { data: movements, isLoading: isLoadingMovements } = useCollection<AnimalMovement>(movementsQuery);
     
+    const uniqueAnimalTypes = useMemo(() => {
+        if (!animals) return [];
+        return ['All', ...Array.from(new Set(animals.map(a => a.type)))];
+    }, [animals]);
+    
     const animalMap = useMemo(() => new Map(animals?.map(a => [a.id, a])), [animals]);
     
     const dailySummaryData = useMemo(() => {
-        const animalsToProcess = selectedAnimalId === 'All' 
+        const animalsToProcess = selectedAnimalType === 'All' 
             ? animals 
-            : animals?.filter(a => a.id === selectedAnimalId);
+            : animals?.filter(a => a.type === selectedAnimalType);
 
         if (!animalsToProcess || !movements || !dateRange?.from) return [];
 
@@ -427,6 +433,7 @@ function DailySummaryReport() {
             if (lastMovementBeforeStart) {
                 animalStateAtStart.set(animal.id, lastMovementBeforeStart.type === 'Entry' ? 'in' : 'out');
             } else {
+                 // If no movement history before start date, assume it's out.
                 animalStateAtStart.set(animal.id, 'out');
             }
         });
@@ -452,15 +459,11 @@ function DailySummaryReport() {
         const reportData: DailySummaryRow[] = [];
 
         dateArray.forEach(currentDate => {
+            const animalsInScopeIds = new Set(animalsToProcess.map(a => a.id));
             const currentDayMovements = sortedMovements.filter(m => {
                 const isCorrectDate = startOfDay(new Date(m.date)).getTime() === currentDate.getTime();
-                const isCorrectAnimal = selectedAnimalId === 'All' || m.animalId === selectedAnimalId;
-                return isCorrectDate && isCorrectAnimal;
+                return isCorrectDate && animalsInScopeIds.has(m.animalId);
             });
-
-            if (selectedAnimalId !== 'All' && currentDayMovements.length === 0) {
-                 return; // For single animal view, only show days with movements
-            }
 
             const inMovements = currentDayMovements.filter(m => m.type === 'Entry');
             const outMovements = currentDayMovements.filter(m => m.type === 'Exit');
@@ -501,35 +504,33 @@ function DailySummaryReport() {
                 '>3yr': openingBalance['>3yr'] + dailyIn['>3yr'] - dailyOut['>3yr'],
             };
             
-            if (currentDayMovements.length > 0) {
-                reportData.push({
-                    date: format(currentDate, 'dd-MM-yyyy'),
-                    openingMale: openingBalance.male,
-                    openingFemale: openingBalance.female,
-                    opening0_3yr: openingBalance['0-3yr'],
-                    openingGt3yr: openingBalance['>3yr'],
-                    inMale: dailyIn.male,
-                    inFemale: dailyIn.female,
-                    in0_3yr: dailyIn['0-3yr'],
-                    inGt3yr: dailyIn['>3yr'],
-                    inReasons: dailyIn.reasons.join(', '),
-                    outMale: dailyOut.male,
-                    outFemale: dailyOut.female,
-                    out0_3yr: dailyOut['0-3yr'],
-                    outGt3yr: dailyOut['>3yr'],
-                    outReasons: dailyOut.reasons.join(', '),
-                    closingMale: closingBalance.male,
-                    closingFemale: closingBalance.female,
-                    closing0_3yr: closingBalance['0-3yr'],
-                    closingGt3yr: closingBalance['>3yr'],
-                });
-            }
+            reportData.push({
+                date: format(currentDate, 'dd-MM-yyyy'),
+                openingMale: openingBalance.male,
+                openingFemale: openingBalance.female,
+                opening0_3yr: openingBalance['0-3yr'],
+                openingGt3yr: openingBalance['>3yr'],
+                inMale: dailyIn.male,
+                inFemale: dailyIn.female,
+                in0_3yr: dailyIn['0-3yr'],
+                inGt3yr: dailyIn['>3yr'],
+                inReasons: dailyIn.reasons.join(', '),
+                outMale: dailyOut.male,
+                outFemale: dailyOut.female,
+                out0_3yr: dailyOut['0-3yr'],
+                outGt3yr: dailyOut['>3yr'],
+                outReasons: dailyOut.reasons.join(', '),
+                closingMale: closingBalance.male,
+                closingFemale: closingBalance.female,
+                closing0_3yr: closingBalance['0-3yr'],
+                closingGt3yr: closingBalance['>3yr'],
+            });
 
             openingBalance = closingBalance;
         });
 
         return reportData;
-    }, [animals, movements, dateRange, animalMap, selectedAnimalId]);
+    }, [animals, movements, dateRange, animalMap, selectedAnimalType]);
 
     const isLoading = isLoadingAnimals || isLoadingMovements;
 
@@ -570,23 +571,19 @@ function DailySummaryReport() {
                         <Popover open={animalPopoverOpen} onOpenChange={setAnimalPopoverOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" role="combobox" className="w-full md:w-[200px] justify-between">
-                                    {selectedAnimalId === 'All' ? 'All Animals' : animals?.find(a => a.id === selectedAnimalId)?.govtTagNo || 'Select Animal...'}
+                                    {selectedAnimalType}
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                                 <Command>
-                                    <CommandInput placeholder="Search animal tag..." />
-                                    <CommandEmpty>No animals found.</CommandEmpty>
+                                    <CommandInput placeholder="Search animal type..." />
+                                    <CommandEmpty>No animal types found.</CommandEmpty>
                                     <CommandGroup>
-                                        <CommandItem key="all-animals" value="All Animals" onSelect={() => { setSelectedAnimalId('All'); setAnimalPopoverOpen(false); }}>
-                                            <Check className={cn("mr-2 h-4 w-4", selectedAnimalId === 'All' ? "opacity-100" : "opacity-0")} />
-                                            All Animals
-                                        </CommandItem>
-                                        {animals?.map(animal => (
-                                            <CommandItem key={animal.id} value={animal.govtTagNo} onSelect={() => { setSelectedAnimalId(animal.id); setAnimalPopoverOpen(false); }}>
-                                                <Check className={cn("mr-2 h-4 w-4", selectedAnimalId === animal.id ? "opacity-100" : "opacity-0")} />
-                                                {animal.govtTagNo}
+                                        {uniqueAnimalTypes.map(type => (
+                                            <CommandItem key={type} value={type} onSelect={() => { setSelectedAnimalType(type); setAnimalPopoverOpen(false); }}>
+                                                <Check className={cn("mr-2 h-4 w-4", selectedAnimalType === type ? "opacity-100" : "opacity-0")} />
+                                                {type}
                                             </CommandItem>
                                         ))}
                                     </CommandGroup>
@@ -714,4 +711,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
 
