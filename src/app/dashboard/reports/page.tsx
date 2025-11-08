@@ -9,14 +9,14 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileDown, FileText, Sheet as ExcelIcon } from 'lucide-react';
+import { FileDown, FileText, Sheet as ExcelIcon, Search } from 'lucide-react';
 import { DatePickerWithRange } from '@/components/date-picker-range';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection } from 'firebase/firestore';
-import type { Animal } from '@/lib/types';
+import type { Animal, AnimalMovement } from '@/lib/types';
 import { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -24,6 +24,9 @@ import 'jspdf-autotable';
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
 import { format } from 'date-fns';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 declare module 'jspdf' {
   interface jsPDF {
@@ -198,6 +201,157 @@ function CowRegistryReport() {
     );
 }
 
+function MovementHistoryReport() {
+    const firestore = useFirestore();
+    const { user } = useUser();
+    
+    const [filter, setFilter] = useState<'All' | 'Entry' | 'Exit'>('All');
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const animalsQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return collection(firestore, `users/${user.uid}/animals`);
+    }, [user, firestore]);
+
+    const movementsQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return collection(firestore, `users/${user.uid}/movements`);
+    }, [user, firestore]);
+
+    const { data: animals, isLoading: isLoadingAnimals } = useCollection<Animal>(animalsQuery);
+    const { data: movements, isLoading: isLoadingMovements } = useCollection<AnimalMovement>(movementsQuery);
+    
+    const animalMap = useMemo(() => new Map(animals?.map(a => [a.id, a.govtTagNo])), [animals]);
+
+    const filteredMovements = useMemo(() => {
+        if (!movements) return [];
+        let movementsWithTags = movements.map(m => ({
+            ...m,
+            animalGovtTagNo: animalMap.get(m.animalId) || 'Unknown Tag'
+        }));
+
+        if (filter !== 'All') {
+            movementsWithTags = movementsWithTags.filter(m => m.type === filter);
+        }
+        if (searchTerm) {
+            const lowercasedTerm = searchTerm.toLowerCase();
+            movementsWithTags = movementsWithTags.filter(m => 
+                m.reason.toLowerCase().includes(lowercasedTerm) || 
+                m.animalGovtTagNo.toLowerCase().includes(lowercasedTerm)
+            );
+        }
+        return movementsWithTags;
+    }, [movements, animalMap, filter, searchTerm]);
+
+    const isLoading = isLoadingAnimals || isLoadingMovements;
+
+    const exportToExcel = () => {
+        const dataToExport = filteredMovements.map(m => ({
+            'Date': format(new Date(m.date), 'dd/MM/yyyy'),
+            'Animal Tag': m.animalGovtTagNo,
+            'Type': m.type,
+            'Reason': m.reason
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Movement History");
+        XLSX.writeFile(workbook, "Movement_History_Report.xlsx");
+    };
+
+    const exportToPdf = () => {
+        const doc = new jsPDF();
+        doc.text("Cow Movement History Report", 14, 15);
+        
+        const tableData = filteredMovements.map(m => [
+            format(new Date(m.date), 'dd/MM/yyyy'),
+            m.animalGovtTagNo,
+            m.type,
+            m.reason
+        ]);
+
+        doc.autoTable({
+            startY: 20,
+            head: [['Date', 'Animal Tag', 'Type', 'Reason']],
+            body: tableData,
+        });
+
+        doc.save('Movement_History_Report.pdf');
+    };
+
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <CardTitle>Cow Movement History</CardTitle>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={exportToExcel} disabled={isLoading || filteredMovements.length === 0}><ExcelIcon className="mr-2 h-4 w-4" /> Excel</Button>
+                        <Button variant="outline" onClick={exportToPdf} disabled={isLoading || filteredMovements.length === 0}><FileText className="mr-2 h-4 w-4" /> PDF</Button>
+                    </div>
+                </div>
+                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-4">
+                    <div className="flex items-center gap-2">
+                        <Button variant={filter === 'All' ? 'default' : 'outline'} onClick={() => setFilter('All')}>All</Button>
+                        <Button variant={filter === 'Entry' ? 'default' : 'outline'} onClick={() => setFilter('Entry')}>Check In</Button>
+                        <Button variant={filter === 'Exit' ? 'default' : 'outline'} onClick={() => setFilter('Exit')}>Check Out</Button>
+                    </div>
+                    <div className="relative w-full md:w-auto">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                            placeholder="Search by reason or cow..." 
+                            className="pl-8 w-full md:w-[300px]"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Animal Tag</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Reason</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading && Array.from({length: 5}).map((_, i) => (
+                            <TableRow key={i}>
+                                <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                                <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                            </TableRow>
+                        ))}
+                        {!isLoading && filteredMovements.map(movement => (
+                            <TableRow key={movement.id}>
+                                <TableCell>{format(new Date(movement.date), 'dd/MM/yyyy')}</TableCell>
+                                <TableCell className="font-medium">{movement.animalGovtTagNo}</TableCell>
+                                <TableCell>
+                                    <Badge className={cn(movement.type === 'Entry' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800')} variant={movement.type === 'Entry' ? 'secondary' : 'destructive'}>
+                                        {movement.type === 'Entry' ? 'Check In' : 'Check Out'}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>{movement.reason}</TableCell>
+                            </TableRow>
+                        ))}
+                        {!isLoading && filteredMovements.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                    No movements found.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+}
+
+
 export default function ReportsPage() {
   return (
     <div className="space-y-6">
@@ -208,7 +362,7 @@ export default function ReportsPage() {
       <Tabs defaultValue="cow-registry">
         <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full md:w-auto">
             <TabsTrigger value="cow-registry">Cow Registry</TabsTrigger>
-            <TabsTrigger value="movement-history" disabled>Movement History</TabsTrigger>
+            <TabsTrigger value="movement-history">Movement History</TabsTrigger>
             <TabsTrigger value="daily-summary" disabled>Daily Summary</TabsTrigger>
             <TabsTrigger value="cross-tab" disabled>Cross-Tab Summary</TabsTrigger>
             <TabsTrigger value="detailed-report" disabled>Detailed Report</TabsTrigger>
@@ -216,6 +370,9 @@ export default function ReportsPage() {
 
         <TabsContent value="cow-registry" className="mt-4">
             <CowRegistryReport />
+        </TabsContent>
+        <TabsContent value="movement-history" className="mt-4">
+            <MovementHistoryReport />
         </TabsContent>
       </Tabs>
       
