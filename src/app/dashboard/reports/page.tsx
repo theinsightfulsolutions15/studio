@@ -34,7 +34,7 @@ declare module 'jspdf' {
   }
 }
 
-function CowRegistryReport() {
+function AnimalRegistryReport() {
     const firestore = useFirestore();
     const { user } = useUser();
 
@@ -87,13 +87,13 @@ function CowRegistryReport() {
         }));
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Cow Registry");
-        XLSX.writeFile(workbook, "Cow_Registry_Report.xlsx");
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Animal Registry");
+        XLSX.writeFile(workbook, "Animal_Registry_Report.xlsx");
     };
 
     const exportToPdf = () => {
         const doc = new jsPDF();
-        doc.text("Cow Registry Report", 14, 15);
+        doc.text("Animal Registry Report", 14, 15);
         
         const tableData = filteredAnimals.map(animal => [
             animal.govtTagNo,
@@ -111,14 +111,14 @@ function CowRegistryReport() {
             body: tableData,
         });
 
-        doc.save('Cow_Registry_Report.pdf');
+        doc.save('Animal_Registry_Report.pdf');
     };
 
     return (
         <Card>
             <CardHeader>
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <CardTitle>Cow Registry</CardTitle>
+                    <CardTitle>Animal Registry</CardTitle>
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={exportToExcel} disabled={isLoading || filteredAnimals.length === 0}><ExcelIcon className="mr-2 h-4 w-4" /> Excel</Button>
                         <Button variant="outline" onClick={exportToPdf} disabled={isLoading || filteredAnimals.length === 0}><FileText className="mr-2 h-4 w-4" /> PDF</Button>
@@ -260,7 +260,7 @@ function MovementHistoryReport() {
 
     const exportToPdf = () => {
         const doc = new jsPDF();
-        doc.text("Cow Movement History Report", 14, 15);
+        doc.text("Animal Movement History Report", 14, 15);
         
         const tableData = filteredMovements.map(m => [
             format(new Date(m.date), 'dd/MM/yyyy'),
@@ -283,7 +283,7 @@ function MovementHistoryReport() {
         <Card>
             <CardHeader>
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <CardTitle>Cow Movement History</CardTitle>
+                    <CardTitle>Animal Movement History</CardTitle>
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={exportToExcel} disabled={isLoading || filteredMovements.length === 0}><ExcelIcon className="mr-2 h-4 w-4" /> Excel</Button>
                         <Button variant="outline" onClick={exportToPdf} disabled={isLoading || filteredMovements.length === 0}><FileText className="mr-2 h-4 w-4" /> PDF</Button>
@@ -298,7 +298,7 @@ function MovementHistoryReport() {
                     <div className="relative w-full md:w-auto">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input 
-                            placeholder="Search by reason or cow..." 
+                            placeholder="Search by reason or animal..." 
                             className="pl-8 w-full md:w-[300px]"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -359,17 +359,17 @@ export default function ReportsPage() {
         <h1 className="text-3xl font-bold font-headline">Reports</h1>
       </div>
 
-      <Tabs defaultValue="cow-registry">
+      <Tabs defaultValue="animal-registry">
         <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full md:w-auto">
-            <TabsTrigger value="cow-registry">Cow Registry</TabsTrigger>
+            <TabsTrigger value="animal-registry">Animal Registry</TabsTrigger>
             <TabsTrigger value="movement-history">Movement History</TabsTrigger>
             <TabsTrigger value="daily-summary" disabled>Daily Summary</TabsTrigger>
             <TabsTrigger value="cross-tab" disabled>Cross-Tab Summary</TabsTrigger>
             <TabsTrigger value="detailed-report" disabled>Detailed Report</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="cow-registry" className="mt-4">
-            <CowRegistryReport />
+        <TabsContent value="animal-registry" className="mt-4">
+            <AnimalRegistryReport />
         </TabsContent>
         <TabsContent value="movement-history" className="mt-4">
             <MovementHistoryReport />
