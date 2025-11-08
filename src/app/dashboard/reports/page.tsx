@@ -424,31 +424,19 @@ function DailySummaryReport() {
         
         const sortedMovements = movements.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
-        const animalStateAtStart: { [key: string]: 'in' | 'out' } = {};
+        let openingBalance = { male: 0, female: 0, '0-3yr': 0, '>3yr': 0 };
         animalsToProcess.forEach(animal => {
             const lastMovementBeforeStart = sortedMovements
                 .filter(m => m.animalId === animal.id && startOfDay(new Date(m.date)) < startDate)
                 .pop();
             
             if (lastMovementBeforeStart?.type === 'Entry') {
-                animalStateAtStart[animal.id] = 'in';
-            } else {
-                 animalStateAtStart[animal.id] = 'out';
-            }
-        });
+                 const age = startDate.getFullYear() - animal.yearOfBirth;
+                 if (animal.gender === 'Male') openingBalance.male++;
+                 else openingBalance.female++;
 
-        let openingBalance = { male: 0, female: 0, '0-3yr': 0, '>3yr': 0 };
-        Object.keys(animalStateAtStart).forEach(animalId => {
-            if (animalStateAtStart[animalId] === 'in') {
-                const animalDetails = animalMap.get(animalId);
-                if (animalDetails) {
-                    const age = startDate.getFullYear() - animalDetails.yearOfBirth;
-                    if (animalDetails.gender === 'Male') openingBalance.male++;
-                    else openingBalance.female++;
-
-                    if (age <= 3) openingBalance['0-3yr']++;
-                    else openingBalance['>3yr']++;
-                }
+                 if (age <= 3) openingBalance['0-3yr']++;
+                 else openingBalance['>3yr']++;
             }
         });
 
@@ -531,13 +519,13 @@ function DailySummaryReport() {
         
         const tableData = dailySummaryData.map(row => Object.values(row));
         const head = [
-            'Date', 'Open M', 'Open F', 'Open 0-3', 'Open >3', 'In M', 'In F', 'In 0-3', 'In >3', 'In Reasons',
-            'Out M', 'Out F', 'Out 0-3', 'Out >3', 'Out Reasons', 'Close M', 'Close F', 'Close 0-3', 'Close >3'
+            ['Date', 'Open M', 'Open F', 'Open 0-3', 'Open >3', 'In M', 'In F', 'In 0-3', 'In >3', 'In Reasons',
+            'Out M', 'Out F', 'Out 0-3', 'Out >3', 'Out Reasons', 'Close M', 'Close F', 'Close 0-3', 'Close >3']
         ];
 
         doc.autoTable({
             startY: 20,
-            head: [head],
+            head: head,
             body: tableData,
             styles: { fontSize: 7, cellPadding: 1 },
             headStyles: { fontStyle: 'bold', fontSize: 7, fillColor: [22, 163, 74] },
@@ -586,32 +574,26 @@ function DailySummaryReport() {
                  <div className="w-full overflow-x-auto">
                     <Table>
                         <TableHeader>
-                           <TableRow>
-                                <TableHead rowSpan={2} className="text-center align-middle border-r">Date</TableHead>
-                                <TableHead colSpan={4} className="text-center border-r">Opening Balance</TableHead>
-                                <TableHead colSpan={5} className="text-center border-r">In</TableHead>
-                                <TableHead colSpan={5} className="text-center border-r">Out</TableHead>
-                                <TableHead colSpan={4} className="text-center">Closing Balance</TableHead>
-                            </TableRow>
                             <TableRow>
-                                <TableHead className="text-center">M</TableHead>
-                                <TableHead className="text-center">F</TableHead>
-                                <TableHead className="text-center">0-3</TableHead>
-                                <TableHead className="text-center border-r">&gt;3</TableHead>
-                                <TableHead className="text-center">M</TableHead>
-                                <TableHead className="text-center">F</TableHead>
-                                <TableHead className="text-center">0-3</TableHead>
-                                <TableHead className="text-center">&gt;3</TableHead>
-                                <TableHead className="border-r">Reason</TableHead>
-                                <TableHead className="text-center">M</TableHead>
-                                <TableHead className="text-center">F</TableHead>
-                                <TableHead className="text-center">0-3</TableHead>
-                                <TableHead className="text-center">&gt;3</TableHead>
-                                <TableHead className="border-r">Reason</TableHead>
-                                <TableHead className="text-center">M</TableHead>
-                                <TableHead className="text-center">F</TableHead>
-                                <TableHead className="text-center">0-3</TableHead>
-                                <TableHead className="text-center">&gt;3</TableHead>
+                                <TableHead className="border-r">Date</TableHead>
+                                <TableHead>Open M</TableHead>
+                                <TableHead>Open F</TableHead>
+                                <TableHead>Open 0-3</TableHead>
+                                <TableHead className="border-r">Open &gt;3</TableHead>
+                                <TableHead>In M</TableHead>
+                                <TableHead>In F</TableHead>
+                                <TableHead>In 0-3</TableHead>
+                                <TableHead>In &gt;3</TableHead>
+                                <TableHead className="border-r">In Reasons</TableHead>
+                                <TableHead>Out M</TableHead>
+                                <TableHead>Out F</TableHead>
+                                <TableHead>Out 0-3</TableHead>
+                                <TableHead>Out &gt;3</TableHead>
+                                <TableHead className="border-r">Out Reasons</TableHead>
+                                <TableHead>Close M</TableHead>
+                                <TableHead>Close F</TableHead>
+                                <TableHead>Close 0-3</TableHead>
+                                <TableHead>Close &gt;3</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -627,12 +609,12 @@ function DailySummaryReport() {
                                     <TableCell className="text-center">{row.inFemale}</TableCell>
                                     <TableCell className="text-center">{row.in0_3yr}</TableCell>
                                     <TableCell className="text-center">{row.inGt3yr}</TableCell>
-                                    <TableCell className="max-w-xs truncate border-r">{row.inReasons}</TableCell>
+                                    <TableCell className="max-w-[150px] truncate border-r">{row.inReasons}</TableCell>
                                     <TableCell className="text-center">{row.outMale}</TableCell>
                                     <TableCell className="text-center">{row.outFemale}</TableCell>
                                     <TableCell className="text-center">{row.out0_3yr}</TableCell>
                                     <TableCell className="text-center">{row.outGt3yr}</TableCell>
-                                    <TableCell className="max-w-xs truncate border-r">{row.outReasons}</TableCell>
+                                    <TableCell className="max-w-[150px] truncate border-r">{row.outReasons}</TableCell>
                                     <TableCell className="text-center">{row.closingMale}</TableCell>
                                     <TableCell className="text-center">{row.closingFemale}</TableCell>
                                     <TableCell className="text-center">{row.closing0_3yr}</TableCell>
@@ -863,11 +845,11 @@ function CrossTabSummaryReport() {
                                     <TableCell className="text-center">{crossTabData.male.in['0-3yr']}</TableCell>
                                     <TableCell className="text-center">{crossTabData.male.in['>3yr']}</TableCell>
                                     <TableCell className="text-center font-bold">{crossTabData.male.in.total}</TableCell>
-                                    <TableCell className="text-center border-r">{[...new Set(crossTabData.male.in.reasons)].join(', ')}</TableCell>
+                                    <TableCell className="text-center border-r max-w-xs truncate">{[...new Set(crossTabData.male.in.reasons)].join(', ')}</TableCell>
                                     <TableCell className="text-center">{crossTabData.male.out['0-3yr']}</TableCell>
                                     <TableCell className="text-center">{crossTabData.male.out['>3yr']}</TableCell>
                                     <TableCell className="text-center font-bold">{crossTabData.male.out.total}</TableCell>
-                                    <TableCell className="text-center border-r">{[...new Set(crossTabData.male.out.reasons)].join(', ')}</TableCell>
+                                    <TableCell className="text-center border-r max-w-xs truncate">{[...new Set(crossTabData.male.out.reasons)].join(', ')}</TableCell>
                                     <TableCell className="text-center">{crossTabData.male.closing['0-3yr']}</TableCell>
                                     <TableCell className="text-center">{crossTabData.male.closing['>3yr']}</TableCell>
                                     <TableCell className="text-center font-bold">{crossTabData.male.closing.total}</TableCell>
@@ -880,11 +862,11 @@ function CrossTabSummaryReport() {
                                     <TableCell className="text-center">{crossTabData.female.in['0-3yr']}</TableCell>
                                     <TableCell className="text-center">{crossTabData.female.in['>3yr']}</TableCell>
                                     <TableCell className="text-center font-bold">{crossTabData.female.in.total}</TableCell>
-                                    <TableCell className="text-center border-r">{[...new Set(crossTabData.female.in.reasons)].join(', ')}</TableCell>
+                                    <TableCell className="text-center border-r max-w-xs truncate">{[...new Set(crossTabData.female.in.reasons)].join(', ')}</TableCell>
                                     <TableCell className="text-center">{crossTabData.female.out['0-3yr']}</TableCell>
                                     <TableCell className="text-center">{crossTabData.female.out['>3yr']}</TableCell>
                                     <TableCell className="text-center font-bold">{crossTabData.female.out.total}</TableCell>
-                                    <TableCell className="text-center border-r">{[...new Set(crossTabData.female.out.reasons)].join(', ')}</TableCell>
+                                    <TableCell className="text-center border-r max-w-xs truncate">{[...new Set(crossTabData.female.out.reasons)].join(', ')}</TableCell>
                                     <TableCell className="text-center">{crossTabData.female.closing['0-3yr']}</TableCell>
                                     <TableCell className="text-center">{crossTabData.female.closing['>3yr']}</TableCell>
                                     <TableCell className="text-center font-bold">{crossTabData.female.closing.total}</TableCell>
@@ -897,11 +879,11 @@ function CrossTabSummaryReport() {
                                     <TableCell className="text-center">{crossTabData.total.in['0-3yr']}</TableCell>
                                     <TableCell className="text-center">{crossTabData.total.in['>3yr']}</TableCell>
                                     <TableCell className="text-center font-bold">{crossTabData.total.in.total}</TableCell>
-                                    <TableCell className="text-center border-r">{[...new Set(crossTabData.total.in.reasons)].join(', ')}</TableCell>
+                                    <TableCell className="text-center border-r max-w-xs truncate">{[...new Set(crossTabData.total.in.reasons)].join(', ')}</TableCell>
                                     <TableCell className="text-center">{crossTabData.total.out['0-3yr']}</TableCell>
                                     <TableCell className="text-center">{crossTabData.total.out['>3yr']}</TableCell>
                                     <TableCell className="text-center font-bold">{crossTabData.total.out.total}</TableCell>
-                                    <TableCell className="text-center border-r">{[...new Set(crossTabData.total.out.reasons)].join(', ')}</TableCell>
+                                    <TableCell className="text-center border-r max-w-xs truncate">{[...new Set(crossTabData.total.out.reasons)].join(', ')}</TableCell>
                                     <TableCell className="text-center">{crossTabData.total.closing['0-3yr']}</TableCell>
                                     <TableCell className="text-center">{crossTabData.total.closing['>3yr']}</TableCell>
                                     <TableCell className="text-center font-bold">{crossTabData.total.closing.total}</TableCell>
@@ -914,6 +896,182 @@ function CrossTabSummaryReport() {
             </CardContent>
         </Card>
     )
+}
+
+type DetailedReportRow = Animal & {
+  checkInDate?: string;
+  checkOutDate?: string;
+  checkOutReason?: string;
+  age?: number;
+};
+
+function DetailedReport() {
+    const firestore = useFirestore();
+    const { user } = useUser();
+
+    const animalsQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return collection(firestore, `users/${user.uid}/animals`);
+    }, [user, firestore]);
+
+    const movementsQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return collection(firestore, `users/${user.uid}/movements`);
+    }, [user, firestore]);
+
+    const { data: animals, isLoading: isLoadingAnimals } = useCollection<Animal>(animalsQuery);
+    const { data: movements, isLoading: isLoadingMovements } = useCollection<AnimalMovement>(movementsQuery);
+    
+    const detailedReportData = useMemo<DetailedReportRow[]>(() => {
+        if (!animals || !movements) return [];
+
+        const movementsMap = new Map<string, { entry?: AnimalMovement; exit?: AnimalMovement }>();
+
+        movements.forEach(movement => {
+            const existing = movementsMap.get(movement.animalId) || {};
+            if (movement.type === 'Entry') {
+                // Keep the earliest entry
+                if (!existing.entry || new Date(movement.date) < new Date(existing.entry.date)) {
+                    existing.entry = movement;
+                }
+            } else { // 'Exit'
+                // Keep the latest exit
+                 if (!existing.exit || new Date(movement.date) > new Date(existing.exit.date)) {
+                    existing.exit = movement;
+                }
+            }
+            movementsMap.set(movement.animalId, existing);
+        });
+
+        return animals.map(animal => {
+            const animalMovements = movementsMap.get(animal.id);
+            const age = new Date().getFullYear() - animal.yearOfBirth;
+            return {
+                ...animal,
+                age,
+                checkInDate: animalMovements?.entry ? format(new Date(animalMovements.entry.date), 'dd-MM-yyyy') : undefined,
+                checkOutDate: animalMovements?.exit ? format(new Date(animalMovements.exit.date), 'dd-MM-yyyy') : undefined,
+                checkOutReason: animalMovements?.exit?.reason,
+            };
+        });
+    }, [animals, movements]);
+
+    const isLoading = isLoadingAnimals || isLoadingMovements;
+
+    const exportToExcel = () => {
+        const dataToExport = detailedReportData.map(row => ({
+            'S.N.': detailedReportData.indexOf(row) + 1,
+            'CHECK IN DATE': row.checkInDate,
+            'TAG NO.': row.govtTagNo,
+            'TAG COLOR': row.tagColor,
+            'BREED': row.breed,
+            'AGE': row.age,
+            'MALE/FEMALE': row.gender,
+            'COW COLOR': row.color,
+            'IDENTIFICATION MARK': row.identificationMark,
+            'HEALTH STATUS': row.healthStatus,
+            'CHECK OUT DATE': row.checkOutDate,
+            'CHECK OUT REASON': row.checkOutReason
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Detailed Report");
+        XLSX.writeFile(workbook, "Detailed_Report.xlsx");
+    };
+
+    const exportToPdf = () => {
+        const doc = new jsPDF({ orientation: 'landscape' });
+        doc.text("Detailed Animal Report", 14, 15);
+
+        const tableData = detailedReportData.map((row, index) => [
+            index + 1,
+            row.checkInDate || '',
+            row.govtTagNo,
+            row.tagColor,
+            row.breed,
+            row.age || '',
+            row.gender,
+            row.color,
+            row.identificationMark || '',
+            row.healthStatus,
+            row.checkOutDate || '',
+            row.checkOutReason || ''
+        ]);
+
+        doc.autoTable({
+            startY: 20,
+            head: [['S.N.', 'Check In Date', 'Tag No.', 'Tag Color', 'Breed', 'Age', 'Gender', 'Cow Color', 'Iden. Mark', 'Health Status', 'Check Out Date', 'Check Out Reason']],
+            body: tableData,
+            styles: { fontSize: 8, cellPadding: 1.5 },
+            headStyles: { fontStyle: 'bold', fontSize: 8, fillColor: [22, 163, 74] },
+        });
+
+        doc.save('Detailed_Report.pdf');
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex justify-between items-center">
+                    <CardTitle>Detailed Report</CardTitle>
+                     <div className="flex gap-2">
+                        <Button variant="outline" onClick={exportToExcel} disabled={isLoading || detailedReportData.length === 0}><ExcelIcon className="mr-2 h-4 w-4" /> Excel</Button>
+                        <Button variant="outline" onClick={exportToPdf} disabled={isLoading || detailedReportData.length === 0}><FileText className="mr-2 h-4 w-4" /> PDF</Button>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                 <div className="w-full overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>S.N.</TableHead>
+                                <TableHead>Check In</TableHead>
+                                <TableHead>Tag No.</TableHead>
+                                <TableHead>Tag Color</TableHead>
+                                <TableHead>Breed</TableHead>
+                                <TableHead>Age</TableHead>
+                                <TableHead>Gender</TableHead>
+                                <TableHead>Cow Color</TableHead>
+                                <TableHead>Iden. Mark</TableHead>
+                                <TableHead>Health</TableHead>
+                                <TableHead>Check Out</TableHead>
+                                <TableHead>Reason</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                                <TableRow key={i}>
+                                    <TableCell colSpan={12}><Skeleton className="h-6 w-full" /></TableCell>
+                                </TableRow>
+                            ))}
+                            {!isLoading && detailedReportData.map((row, index) => (
+                                <TableRow key={row.id}>
+                                    <TableCell>{index + 1}</TableCell>
+                                    <TableCell>{row.checkInDate}</TableCell>
+                                    <TableCell className="font-medium">{row.govtTagNo}</TableCell>
+                                    <TableCell>{row.tagColor}</TableCell>
+                                    <TableCell>{row.breed}</TableCell>
+                                    <TableCell>{row.age}</TableCell>
+                                    <TableCell>{row.gender}</TableCell>
+                                    <TableCell>{row.color}</TableCell>
+                                    <TableCell>{row.identificationMark}</TableCell>
+                                    <TableCell>{row.healthStatus}</TableCell>
+                                    <TableCell>{row.checkOutDate}</TableCell>
+                                    <TableCell>{row.checkOutReason}</TableCell>
+                                </TableRow>
+                            ))}
+                             {!isLoading && detailedReportData.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={12} className="h-24 text-center">No data available.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                 </div>
+            </CardContent>
+        </Card>
+    );
 }
 
 
@@ -930,7 +1088,7 @@ export default function ReportsPage() {
             <TabsTrigger value="movement-history">Movement History</TabsTrigger>
             <TabsTrigger value="daily-summary">Daily Summary</TabsTrigger>
             <TabsTrigger value="cross-tab">Cross-Tab Summary</TabsTrigger>
-            <TabsTrigger value="detailed-report" disabled>Detailed Report</TabsTrigger>
+            <TabsTrigger value="detailed-report">Detailed Report</TabsTrigger>
         </TabsList>
 
         <TabsContent value="animal-registry" className="mt-4">
@@ -944,6 +1102,9 @@ export default function ReportsPage() {
         </TabsContent>
          <TabsContent value="cross-tab" className="mt-4">
             <CrossTabSummaryReport />
+        </TabsContent>
+        <TabsContent value="detailed-report" className="mt-4">
+            <DetailedReport />
         </TabsContent>
       </Tabs>
       
