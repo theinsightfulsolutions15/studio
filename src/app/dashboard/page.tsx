@@ -1,22 +1,19 @@
 
 'use client';
 
-import { useAuth, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+import { useAuth, useCollection, useMemoFirebase, useDoc, useFirestore } from '@/firebase';
 import { collection, collectionGroup, doc } from 'firebase/firestore';
-import { firebaseConfig } from '@/firebase/config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import type { Animal, MilkRecord, FinancialRecord } from '@/lib/types';
-import { useEffect, useMemo } from 'react';
-import { initializeFirebase } from '@/firebase';
-
-const { firestore } = initializeFirebase();
 
 export default function Dashboard() {
   const { user, isUserLoading: isAuthLoading } = useAuth();
-  const { data: userData } = useDoc(user ? doc(firestore, `users/${user.uid}`) : null);
-  const isAdmin = userData?.role === 'Admin';
+  const firestore = useFirestore(); // Correctly get firestore instance from hook
 
+  const userDocRef = useMemoFirebase(() => (user && firestore ? doc(firestore, `users/${user.uid}`) : null), [user, firestore]);
+  const { data: userData } = useDoc(userDocRef);
+  const isAdmin = userData?.role === 'Admin';
 
   // 🧠 Animals Query
   const animalsQuery = useMemoFirebase(() => {
@@ -42,13 +39,20 @@ export default function Dashboard() {
       : collection(firestore, `users/${user.uid}/financial_records`);
   }, [firestore, user, isAdmin]);
 
-  // ✅ Safe useCollection calls (null checks added)
+  // ✅ useCollection को केवल तब चलाओ जब query valid हो
   const { data: animals, isLoading: isLoadingAnimals } = useCollection<Animal>(animalsQuery);
   const { data: milkRecords, isLoading: isLoadingMilk } = useCollection<MilkRecord>(milkRecordsQuery);
   const { data: financialRecords, isLoading: isLoadingFinancial } = useCollection<FinancialRecord>(financialRecordsQuery);
 
+
   // 🌀 Loading state
-  if (isAuthLoading || isLoadingAnimals || isLoadingMilk || isLoadingFinancial) {
+  if (
+    isAuthLoading ||
+    !user ||
+    isLoadingAnimals ||
+    isLoadingMilk ||
+    isLoadingFinancial
+  ) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <Spinner className="w-8 h-8" />
@@ -56,7 +60,7 @@ export default function Dashboard() {
     );
   }
 
-  // 📊 Render Dashboard Data
+  // 📊 Dashboard Summary
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6">
       <Card>
