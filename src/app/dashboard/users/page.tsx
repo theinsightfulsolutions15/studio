@@ -116,7 +116,6 @@ export default function UsersPage() {
   const isAdmin = currentUser?.role === 'Admin';
   
   const usersCollection = useMemoFirebase(() => {
-    // Only fetch if the current user is an admin
     if (!isAdmin || !firestore) return null;
     return collection(firestore, 'users');
   }, [isAdmin, firestore]);
@@ -174,7 +173,10 @@ export default function UsersPage() {
     setDialogOpen(true);
   }
 
-  if (isUserLoading || isAuthUserLoading) {
+  const isLoading = isAuthUserLoading || isUserLoading || (isAdmin && isLoadingUsers);
+
+
+  if (isLoading) {
       return (
         <Card>
             <CardHeader>
@@ -249,7 +251,7 @@ export default function UsersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(isLoadingUsers) && Array.from({ length: 4 }).map((_, i) => <UserRowSkeleton key={i} />)}
+            {(isLoading) && Array.from({ length: 4 }).map((_, i) => <UserRowSkeleton key={i} />)}
             {dataToDisplay?.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>
