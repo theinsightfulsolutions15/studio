@@ -32,7 +32,7 @@ import { Label } from '@/components/ui/label';
 import { Download, Camera, Upload, DatabaseBackup } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, getDocs, query, writeBatch, documentId, where } from 'firebase/firestore';
+import { doc, collection, getDocs, query, writeBatch, documentId, where, setDoc } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -281,6 +281,9 @@ export default function SettingsPage() {
         setIsRestoring(true);
         setIsRestoreAlertOpen(false);
 
+        const statusDocRef = doc(firestore, 'system', 'status');
+        await setDoc(statusDocRef, { isMaintenanceMode: true });
+
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
@@ -346,6 +349,7 @@ export default function SettingsPage() {
                 console.error("Restore error:", error);
                 toast({ variant: 'destructive', title: 'Restore Failed', description: 'An error occurred during the restore process.' });
             } finally {
+                await setDoc(statusDocRef, { isMaintenanceMode: false });
                 setIsRestoring(false);
                 setSelectedFile(null);
                 setSelectedUserId(null);

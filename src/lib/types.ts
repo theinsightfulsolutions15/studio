@@ -99,3 +99,7 @@ export type Account = {
     type: 'Customer' | 'Bank' | 'Expense';
     ownerId?: string;
 };
+
+export type SystemStatus = {
+    isMaintenanceMode: boolean;
+};

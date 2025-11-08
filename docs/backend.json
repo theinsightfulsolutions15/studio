@@ -283,6 +283,19 @@
         "ownerId": { "type": "string", "description": "The ID of the user who owns this account." }
       },
       "required": ["id", "name", "type", "ownerId"]
+    },
+     "SystemStatus": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SystemStatus",
+      "type": "object",
+      "description": "Represents the global status of the application, such as maintenance mode.",
+      "properties": {
+        "isMaintenanceMode": {
+          "type": "boolean",
+          "description": "Indicates whether the system is in maintenance mode."
+        }
+      },
+      "required": ["isMaintenanceMode"]
     }
   },
   "auth": {
@@ -412,6 +425,15 @@
               "description": "The unique identifier for the user."
             }
           ]
+        }
+      },
+      {
+        "path": "/system/status",
+        "definition": {
+          "entityName": "SystemStatus",
+          "schema": { "$ref": "#/backend/entities/SystemStatus" },
+          "description": "A singleton document to store global system status, like maintenance mode. Publicly readable.",
+          "params": []
         }
       }
     ],

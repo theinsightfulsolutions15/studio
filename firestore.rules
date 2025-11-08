@@ -110,5 +110,15 @@ service cloud.firestore {
       // Nobody can list all admin roles for security.
       allow list, delete: if false;
     }
+
+    /**
+     * Rules for system status (e.g., maintenance mode).
+     */
+    match /system/{docId} {
+      // Allow any signed-in user to read system status.
+      allow get, list: if isSignedIn();
+      // Only admins can change system status.
+      allow write: if isAdmin();
+    }
   }
 }

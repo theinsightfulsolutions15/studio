@@ -7,7 +7,7 @@ import { Firestore, doc } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 import { useDoc } from './firestore/use-doc';
-import type { User as AppUser } from '@/lib/types';
+import type { User as AppUser, SystemStatus } from '@/lib/types';
 
 
 interface FirebaseProviderProps {
@@ -36,6 +36,7 @@ export interface FirebaseContextState {
   isUserLoading: boolean; // True during initial auth check
   userError: Error | null; // Error from auth listener
   isAdmin: boolean;
+  isMaintenanceMode: boolean;
 }
 
 // Return type for useFirebase()
@@ -47,6 +48,7 @@ export interface FirebaseServicesAndUser {
   isUserLoading: boolean;
   userError: Error | null;
   isAdmin: boolean;
+  isMaintenanceMode: boolean;
 }
 
 // Return type for useUser() - specific to user auth state
@@ -105,6 +107,14 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   
   const { data: appUser } = useDoc<AppUser>(userDocRef);
 
+  const systemStatusDocRef = useMemo(() => {
+    if (!firestore) return null;
+    return doc(firestore, 'system', 'status');
+  }, [firestore]);
+
+  const { data: systemStatus } = useDoc<SystemStatus>(systemStatusDocRef);
+
+
   // Memoize the context value
   const contextValue = useMemo((): FirebaseContextState => {
     const servicesAvailable = !!(firebaseApp && firestore && auth);
@@ -118,8 +128,9 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       isUserLoading: userAuthState.isUserLoading,
       userError: userAuthState.userError,
       isAdmin,
+      isMaintenanceMode: systemStatus?.isMaintenanceMode || false,
     };
-  }, [firebaseApp, firestore, auth, userAuthState, appUser]);
+  }, [firebaseApp, firestore, auth, userAuthState, appUser, systemStatus]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>
@@ -151,7 +162,8 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     user: context.user,
     isUserLoading: context.isUserLoading,
     userError: context.userError,
-    isAdmin: context.isAdmin
+    isAdmin: context.isAdmin,
+    isMaintenanceMode: context.isMaintenanceMode,
   };
 };
 
@@ -175,6 +187,7 @@ export const useAuth = (): FirebaseServicesAndUser => {
       isUserLoading: context.isUserLoading,
       userError: context.userError,
       isAdmin: context.isAdmin,
+      isMaintenanceMode: context.isMaintenanceMode,
   };
 };
 
