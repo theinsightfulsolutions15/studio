@@ -29,9 +29,9 @@ import {
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Download, Camera, Upload, DatabaseBackup } from 'lucide-react';
+import { Download, Camera, Upload, DatabaseBackup, Power } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection, useFirebase } from '@/firebase';
 import { doc, collection, getDocs, query, writeBatch, documentId, where, setDoc } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useEffect, useState, useRef, useMemo } from 'react';
@@ -44,9 +44,12 @@ import * as XLSX from 'xlsx';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
+
 
 export default function SettingsPage() {
   const { user, isUserLoading, isAdmin } = useUser();
+  const { isMaintenanceMode } = useFirebase();
   const firestore = useFirestore();
   const { toast } = useToast();
   
@@ -361,6 +364,25 @@ export default function SettingsPage() {
         reader.readAsArrayBuffer(selectedFile);
     };
 
+    const handleMaintenanceModeToggle = async (checked: boolean) => {
+        if (!firestore) return;
+        const statusDocRef = doc(firestore, 'system', 'status');
+        try {
+            await setDoc(statusDocRef, { isMaintenanceMode: checked }, { merge: true });
+            toast({
+                title: 'Success',
+                description: `Maintenance mode has been ${checked ? 'enabled' : 'disabled'}.`
+            });
+        } catch (error) {
+            console.error("Error toggling maintenance mode:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Could not update maintenance mode status.'
+            });
+        }
+    };
+
 
   const isLoading = isUserLoading || isUserDocLoading;
 
@@ -480,12 +502,29 @@ export default function SettingsPage() {
                         <AlertTitle className="text-destructive font-semibold">Warning: Destructive Action</AlertTitle>
                         <AlertDescription className="text-destructive/90">
                            Restoring data will permanently overwrite existing data. This action cannot be undone. 
-                           Proceed with extreme caution.
+                           Enable maintenance mode before proceeding.
                         </AlertDescription>
                     </div>
 
                     <div className="space-y-4 rounded-lg border p-4">
-                         <div className="grid md:grid-cols-2 gap-4">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                                <Label htmlFor="maintenance-mode" className="font-semibold">Enable Maintenance Mode</Label>
+                                <p className="text-sm text-muted-foreground">
+                                    Put the app offline for all users before starting the restore.
+                                </p>
+                            </div>
+                            <Switch
+                                id="maintenance-mode"
+                                checked={isMaintenanceMode}
+                                onCheckedChange={handleMaintenanceModeToggle}
+                                disabled={isRestoring}
+                            />
+                        </div>
+                     </div>
+
+                    <div className={cn("space-y-4 rounded-lg border p-4", !isMaintenanceMode && "opacity-50 pointer-events-none")}>
+                        <div className="grid md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Restore Mode</Label>
                                  <Select value={restoreMode} onValueChange={(v: 'full' | 'user') => setRestoreMode(v)}>
@@ -592,7 +631,5 @@ export default function SettingsPage() {
     </>
   );
 }
-
-    
 
     
