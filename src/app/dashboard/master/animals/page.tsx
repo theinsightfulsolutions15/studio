@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import {
@@ -608,15 +609,15 @@ export default function AnimalsPage() {
     {isMobile && renderActionButton()}
 
     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-4xl">
             <DialogHeader>
                 <DialogTitle>{dialogTitles[dialogMode]}</DialogTitle>
                 <DialogDescription>
                     {dialogDescriptions[dialogMode]}
                 </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4 max-h-[75vh] overflow-y-auto px-1">
-                <div className="flex flex-col items-center gap-4">
+            <div className="grid md:grid-cols-2 gap-6 py-4">
+                 <div className="flex flex-col items-center gap-4">
                     <div className="w-32 h-32 rounded-md bg-muted flex items-center justify-center overflow-hidden">
                             {capturedImage ? (
                             <Image src={capturedImage} alt="Animal" width={128} height={128} className="object-cover h-full w-full" />
