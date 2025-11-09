@@ -609,128 +609,120 @@ export default function AnimalsPage() {
     {isMobile && renderActionButton()}
 
     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-4xl">
-            <DialogHeader>
-                <DialogTitle>{dialogTitles[dialogMode]}</DialogTitle>
-                <DialogDescription>
-                    {dialogDescriptions[dialogMode]}
-                </DialogDescription>
-            </DialogHeader>
-            <div className="grid md:grid-cols-2 gap-6 py-4">
-                 <div className="flex flex-col items-center gap-4">
-                    <div className="w-32 h-32 rounded-md bg-muted flex items-center justify-center overflow-hidden">
-                            {capturedImage ? (
-                            <Image src={capturedImage} alt="Animal" width={128} height={128} className="object-cover h-full w-full" />
-                        ) : (
-                            <Camera className="h-12 w-12 text-muted-foreground" />
-                        )}
-                    </div>
-                    {dialogMode !== 'view' && (
-                        <div className="w-full max-w-[240px] grid grid-cols-2 gap-2">
-                            <Button variant="outline" onClick={() => setIsCaptureDialogOpen(true)}>
-                                <Camera className="mr-2 h-4 w-4" />
-                                Capture
-                            </Button>
-                            <Button variant="outline" onClick={() => uploadInputRef.current?.click()}>
-                                <Upload className="mr-2 h-4 w-4" />
-                                Upload
-                            </Button>
-                            <input
-                                type="file"
-                                ref={uploadInputRef}
-                                onChange={handleImageUpload}
-                                className="hidden"
-                                accept="image/*"
-                            />
-                        </div>
-                    )}
+      <DialogContent className="sm:max-w-4xl p-0">
+        <div className="flex flex-col h-full max-h-[90svh]">
+          <DialogHeader className="p-6 pb-4">
+            <DialogTitle>{dialogTitles[dialogMode]}</DialogTitle>
+            <DialogDescription>{dialogDescriptions[dialogMode]}</DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 overflow-y-auto">
+            <div className="grid md:grid-cols-2 gap-6 p-6 pt-0">
+              <div className="flex flex-col items-center gap-4 md:sticky md:top-0">
+                <div className="w-32 h-32 rounded-md bg-muted flex items-center justify-center overflow-hidden">
+                  {capturedImage ? (
+                    <Image src={capturedImage} alt="Animal" width={128} height={128} className="object-cover h-full w-full" />
+                  ) : (
+                    <Camera className="h-12 w-12 text-muted-foreground" />
+                  )}
                 </div>
-                <div className="grid gap-4">
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="type">Type</Label>
-                            <Select value={formData.type} onValueChange={(value) => setFormData({...formData, type: value })} disabled={dialogMode === 'view'}>
-                                <SelectTrigger id="type">
-                                    <SelectValue placeholder="Select type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Cow">Cow</SelectItem>
-                                    <SelectItem value="Buffalo">Buffalo</SelectItem>
-                                    <SelectItem value="Bull">Bull</SelectItem>
-                                    <SelectItem value="Calf">Calf</SelectItem>
-                                    <SelectItem value="Other">Other</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="govtTagNo">Govt. Tag No.</Label>
-                            <Input id="govtTagNo" value={formData.govtTagNo} onChange={(e) => setFormData({ ...formData, govtTagNo: e.target.value })} placeholder="UID12345" disabled={dialogMode === 'view'} />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="breed">Breed</Label>
-                            <Input id="breed" value={formData.breed} onChange={(e) => setFormData({ ...formData, breed: e.target.value })} placeholder="e.g., Gir, Murrah" disabled={dialogMode === 'view'} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="color">Color</Label>
-                            <Input id="color" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} placeholder="e.g., Brown, Black" disabled={dialogMode === 'view'} />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="gender">Gender</Label>
-                            <Select value={formData.gender} onValueChange={(value: 'Male' | 'Female') => setFormData({ ...formData, gender: value })} disabled={dialogMode === 'view'}>
-                                <SelectTrigger id="gender">
-                                    <SelectValue placeholder="Select gender" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Female">Female</SelectItem>
-                                    <SelectItem value="Male">Male</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="yearOfBirth">Year of Birth</Label>
-                            <Input id="yearOfBirth" type="number" value={formData.yearOfBirth} onChange={(e) => setFormData({ ...formData, yearOfBirth: parseInt(e.target.value) })} placeholder="e.g., 2020" disabled={dialogMode === 'view'} />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="healthStatus">Health Status</Label>
-                            <Select value={formData.healthStatus} onValueChange={(value: 'Healthy' | 'Sick' | 'Under Treatment') => setFormData({ ...formData, healthStatus: value })} disabled={dialogMode === 'view'}>
-                                <SelectTrigger id="healthStatus">
-                                    <SelectValue placeholder="Select status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Healthy">Healthy</SelectItem>
-                                    <SelectItem value="Sick">Sick</SelectItem>
-                                    <SelectItem value="Under Treatment">Under Treatment</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="tagColor">Tag Color</Label>
-                            <Input id="tagColor" value={formData.tagColor} onChange={(e) => setFormData({ ...formData, tagColor: e.target.value })} placeholder="e.g., Yellow, Blue" disabled={dialogMode === 'view'} />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="identificationMark">Identification Mark</Label>
-                        <Input id="identificationMark" value={formData.identificationMark} onChange={(e) => setFormData({ ...formData, identificationMark: e.target.value })} placeholder="Any unique marks" disabled={dialogMode === 'view'} />
-                    </div>
-                </div>
-            </div>
-            <DialogFooter className="pt-4 border-t">
-                <DialogClose asChild>
-                    <Button type="button" variant="secondary">Cancel</Button>
-                </DialogClose>
                 {dialogMode !== 'view' && (
-                    <Button type="submit" onClick={handleFormSubmit} disabled={isSubmitting}>
-                        {isSubmitting ? 'Saving...' : (dialogMode === 'create' ? 'Register Animal' : 'Save Changes')}
+                  <div className="w-full max-w-[240px] grid grid-cols-2 gap-2">
+                    <Button variant="outline" onClick={() => setIsCaptureDialogOpen(true)}>
+                      <Camera className="mr-2 h-4 w-4" />
+                      Capture
                     </Button>
+                    <Button variant="outline" onClick={() => uploadInputRef.current?.click()}>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload
+                    </Button>
+                    <input type="file" ref={uploadInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
+                  </div>
                 )}
-            </DialogFooter>
-        </DialogContent>
+              </div>
+              <div className="grid gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="type">Type</Label>
+                    <Select value={formData.type} onValueChange={(value) => setFormData({...formData, type: value })} disabled={dialogMode === 'view'}>
+                      <SelectTrigger id="type"><SelectValue placeholder="Select type" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Cow">Cow</SelectItem>
+                        <SelectItem value="Buffalo">Buffalo</SelectItem>
+                        <SelectItem value="Bull">Bull</SelectItem>
+                        <SelectItem value="Calf">Calf</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="govtTagNo">Govt. Tag No.</Label>
+                    <Input id="govtTagNo" value={formData.govtTagNo} onChange={(e) => setFormData({ ...formData, govtTagNo: e.target.value })} placeholder="UID12345" disabled={dialogMode === 'view'} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="breed">Breed</Label>
+                    <Input id="breed" value={formData.breed} onChange={(e) => setFormData({ ...formData, breed: e.target.value })} placeholder="e.g., Gir, Murrah" disabled={dialogMode === 'view'} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="color">Color</Label>
+                    <Input id="color" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} placeholder="e.g., Brown, Black" disabled={dialogMode === 'view'} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="gender">Gender</Label>
+                    <Select value={formData.gender} onValueChange={(value: 'Male' | 'Female') => setFormData({ ...formData, gender: value })} disabled={dialogMode === 'view'}>
+                      <SelectTrigger id="gender"><SelectValue placeholder="Select gender" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Female">Female</SelectItem>
+                        <SelectItem value="Male">Male</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="yearOfBirth">Year of Birth</Label>
+                    <Input id="yearOfBirth" type="number" value={formData.yearOfBirth} onChange={(e) => setFormData({ ...formData, yearOfBirth: parseInt(e.target.value) })} placeholder="e.g., 2020" disabled={dialogMode === 'view'} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="healthStatus">Health Status</Label>
+                    <Select value={formData.healthStatus} onValueChange={(value: 'Healthy' | 'Sick' | 'Under Treatment') => setFormData({ ...formData, healthStatus: value })} disabled={dialogMode === 'view'}>
+                      <SelectTrigger id="healthStatus"><SelectValue placeholder="Select status" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Healthy">Healthy</SelectItem>
+                        <SelectItem value="Sick">Sick</SelectItem>
+                        <SelectItem value="Under Treatment">Under Treatment</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tagColor">Tag Color</Label>
+                    <Input id="tagColor" value={formData.tagColor} onChange={(e) => setFormData({ ...formData, tagColor: e.target.value })} placeholder="e.g., Yellow, Blue" disabled={dialogMode === 'view'} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="identificationMark">Identification Mark</Label>
+                  <Input id="identificationMark" value={formData.identificationMark} onChange={(e) => setFormData({ ...formData, identificationMark: e.target.value })} placeholder="Any unique marks" disabled={dialogMode === 'view'} />
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="p-6 pt-4 border-t mt-auto">
+            <DialogClose asChild>
+              <Button type="button" variant="secondary">Cancel</Button>
+            </DialogClose>
+            {dialogMode !== 'view' && (
+              <Button type="submit" onClick={handleFormSubmit} disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : (dialogMode === 'create' ? 'Register Animal' : 'Save Changes')}
+              </Button>
+            )}
+          </DialogFooter>
+        </div>
+      </DialogContent>
     </Dialog>
     
     <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
