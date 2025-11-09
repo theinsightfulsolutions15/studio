@@ -6,12 +6,14 @@ import { collection, doc, query, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import type { Animal, MilkRecord, FinancialRecord, User as AppUser, AmcRenewal } from '@/lib/types';
-import { Users, UserCheck, UserPlus, ShieldCheck, Droplets, IndianRupee, Beef, AlertTriangle } from 'lucide-react';
+import { Users, UserCheck, UserPlus, ShieldCheck, Droplets, IndianRupee, Beef, AlertTriangle, Plus, Truck, GlassWater, BookUser } from 'lucide-react';
 import { useMemo } from 'react';
 import { format, isSameDay, isSameMonth, startOfMonth, isPast } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 
 function StatCard({ title, value, icon: Icon, description }: { title: string, value: number | string, icon: React.ElementType, description?: string }) {
@@ -171,6 +173,7 @@ function UserDashboard() {
 
 export default function Dashboard() {
   const { isUserLoading, isAdmin } = useUser();
+  const isMobile = useIsMobile();
 
   if (isUserLoading) {
     return (
@@ -189,6 +192,48 @@ export default function Dashboard() {
             </p>
         </div>
         {isAdmin ? <AdminDashboard /> : <UserDashboard />}
+        
+        {isMobile && !isAdmin && (
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button size="icon" className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-20">
+                        <Plus className="h-6 w-6" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="end" className="w-56 mb-2">
+                    <DropdownMenuItem asChild>
+                        <Link href="/dashboard/master/animals">
+                            <Beef /><span>Add Animal</span>
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                        <Link href="/dashboard/movement">
+                            <Truck /><span>Add Movement</span>
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                        <Link href="/dashboard/milk-records">
+                            <GlassWater /><span>Add Production</span>
+                        </Link>
+                    </DropdownMenuItem>
+                     <DropdownMenuItem asChild>
+                        <Link href="/dashboard/milk-records">
+                            <IndianRupee /><span>Add Milk Sale</span>
+                        </Link>
+                    </DropdownMenuItem>
+                     <DropdownMenuItem asChild>
+                        <Link href="/dashboard/finance">
+                            <IndianRupee /><span>Add New Transaction</span>
+                        </Link>
+                    </DropdownMenuItem>
+                     <DropdownMenuItem asChild>
+                        <Link href="/dashboard/master/accounts">
+                            <BookUser /><span>Add Accounts</span>
+                        </Link>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        )}
     </div>
   );
 }
