@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useAuth, useCollection, useMemoFirebase, useDoc, useFirestore, useUser } from '@/firebase';
+import { useAuth, useCollection, useMemoFirebase, useDoc, useFirestore, useUser, useFirebase } from '@/firebase';
 import { collection, doc, query, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
