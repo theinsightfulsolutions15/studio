@@ -119,7 +119,6 @@ export type SupportTicket = {
     description: string;
     submittedAt: any; // Firestore Timestamp
     status: 'Open' | 'Closed';
-    ownerId?: string;
 };
 
     

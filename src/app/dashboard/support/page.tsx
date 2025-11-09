@@ -114,7 +114,6 @@ export default function SupportPage() {
         description: description,
         submittedAt: serverTimestamp(),
         status: 'Open',
-        ownerId: user.uid,
     };
 
     try {
@@ -220,5 +219,3 @@ export default function SupportPage() {
     </div>
   );
 }
-
-    
