@@ -26,10 +26,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, query, orderBy, where, collectionGroup } from 'firebase/firestore';
+import { collection, doc, query, orderBy, where } from 'firebase/firestore';
 import type { SupportTicket, User as AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MoreHorizontal, Ticket, Inbox } from 'lucide-react';
+import { MoreHorizontal, Inbox } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -74,8 +74,8 @@ export default function SupportTicketsPage() {
 
   const ticketsQuery = useMemoFirebase(() => {
     if (!isAdmin || !firestore) return null;
-    // Use a collectionGroup query to get all tickets from all users.
-    return query(collectionGroup(firestore, 'support_tickets'), orderBy('submittedAt', 'desc'));
+    // Query the top-level collection for all tickets
+    return query(collection(firestore, 'support_tickets'), orderBy('submittedAt', 'desc'));
   }, [isAdmin, firestore]);
 
   const { data: allTickets, isLoading: isLoadingTickets } = useCollection<SupportTicket>(ticketsQuery);
@@ -85,8 +85,8 @@ export default function SupportTicketsPage() {
 
   const handleUpdateStatus = async (ticket: SupportTicket, status: 'Open' | 'Closed') => {
     if (!firestore) return;
-    // The path to the ticket is inside the user's subcollection
-    const ticketRef = doc(firestore, `users/${ticket.userId}/support_tickets`, ticket.id);
+    // The path to the ticket is in the top-level collection
+    const ticketRef = doc(firestore, 'support_tickets', ticket.id);
     try {
         await updateDocumentNonBlocking(ticketRef, { status: status });
         toast({
@@ -236,3 +236,5 @@ export default function SupportTicketsPage() {
     </>
   );
 }
+
+    

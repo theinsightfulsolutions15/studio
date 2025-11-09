@@ -99,15 +99,6 @@ service cloud.firestore {
       match /accounts/{accountId} {
         allow read, write: if (isOwner(userId) || isAdmin()) && isAccountActive();
       }
-       /**
-       * Rules for support tickets (nested collection).
-       */
-      match /support_tickets/{ticketId} {
-        // Users can create and read their own support tickets.
-        allow create, get, list: if isOwner(userId);
-        // Admins can manage all support tickets.
-        allow read, write: if isAdmin();
-      }
     }
     
     // Admins can perform collection group queries on these collections
@@ -120,8 +111,17 @@ service cloud.firestore {
      match /{path=**}/financial_records/{financialRecordId} {
       allow get, list: if isAdmin();
     }
-    match /{path=**}/support_tickets/{ticketId} {
-      allow get, list: if isAdmin();
+    
+    /**
+     * Rules for the top-level support tickets collection.
+     */
+    match /support_tickets/{ticketId} {
+      // A user can create a ticket for themselves.
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // A user can read their own tickets.
+      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // An admin can manage all tickets.
+      allow read, write, delete, list: if isAdmin();
     }
 
     /**
@@ -156,3 +156,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

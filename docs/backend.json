@@ -430,13 +430,12 @@
         }
       },
       {
-        "path": "/users/{userId}/support_tickets/{ticketId}",
+        "path": "/support_tickets/{ticketId}",
         "definition": {
           "entityName": "SupportTicket",
           "schema": { "$ref": "#/backend/entities/SupportTicket" },
-          "description": "Stores support tickets submitted by a specific user. Writable by the user, readable and manageable by admins.",
+          "description": "Stores all support tickets submitted by users. Writable by the ticket owner, fully manageable by admins.",
           "params": [
-            { "name": "userId", "description": "The unique ID of the user." },
             { "name": "ticketId", "description": "The unique ID for the support ticket." }
           ]
         }

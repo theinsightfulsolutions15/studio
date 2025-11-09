@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser, useFirestore, useMemoFirebase, useCollection, useDoc } from '@/firebase';
-import { collection, addDoc, query, orderBy, doc } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, where, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import type { User as AppUser, SupportTicket } from '@/lib/types';
@@ -50,8 +50,10 @@ export default function SupportPage() {
 
   const ticketsQuery = useMemoFirebase(() => {
       if(!user || !firestore) return null;
+      // Query the top-level collection for tickets belonging to the current user
       return query(
-          collection(firestore, `users/${user.uid}/support_tickets`),
+          collection(firestore, 'support_tickets'),
+          where('userId', '==', user.uid),
           orderBy('submittedAt', 'desc')
       );
   }, [user, firestore]);
@@ -91,7 +93,8 @@ export default function SupportPage() {
     };
 
     try {
-        const ticketsColRef = collection(firestore, `users/${user.uid}/support_tickets`);
+        // Save to the top-level 'support_tickets' collection
+        const ticketsColRef = collection(firestore, `support_tickets`);
         await addDocumentNonBlocking(ticketsColRef, ticketData);
         toast({
             title: 'Support Request Submitted',
@@ -227,3 +230,5 @@ export default function SupportPage() {
     </div>
   );
 }
+
+    
