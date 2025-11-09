@@ -224,8 +224,9 @@ export default function SettingsPage() {
                 const userDataToBackup = await fetchDataForUser(u.id);
                 for (const [colName, data] of Object.entries(userDataToBackup)) {
                     if(data.length > 0) {
-                      const safeUserName = (u.name || u.id.substring(0,5)).replace(/[^a-zA-Z0-9]/g, '_');
-                      const sheetName = `${safeUserName}_${colName}`.substring(0, 31);
+                      const safeUserName = (u.name || 'user').replace(/[^a-zA-Z0-9]/g, '_');
+                      const safeCustomerId = (u.customerId || u.id.substring(0,5)).replace(/[^a-zA-Z0-9]/g, '_');
+                      const sheetName = `${safeUserName}_${safeCustomerId}_${colName}`.substring(0, 31);
                       let cleanedData = data;
                       if(colName === 'animals'){
                           cleanedData = cleanDataForExport(data, ['imageUrl']);
@@ -309,10 +310,11 @@ export default function SettingsPage() {
                             }
                         } else {
                             const parts = sheetName.split('_');
-                            const userName = parts.slice(0, -1).join('_');
-                            const collectionName = parts.slice(-1)[0];
-                            
-                            const user = allUsers?.find(u => (u.name || u.id.substring(0,5)).replace(/[^a-zA-Z0-9]/g, '_') === userName);
+                            if (parts.length < 3) continue; // Skip sheets that don't match the user_customerid_collection format
+                            const collectionName = parts[parts.length - 1];
+                            const customerId = parts[parts.length - 2];
+
+                            const user = allUsers?.find(u => u.customerId === customerId);
     
                             if (user) {
                                 for (const record of jsonData) {
@@ -331,15 +333,17 @@ export default function SettingsPage() {
                     const batch = writeBatch(firestore);
                     // User-wise Restore Logic
                     const selectedUser = allUsers?.find(u => u.id === selectedUserId);
-                    if (!selectedUser) {
-                        throw new Error('Selected user not found.');
+                    if (!selectedUser || !selectedUser.customerId) {
+                        throw new Error('Selected user not found or does not have a Customer ID.');
                     }
-                    const safeUserName = (selectedUser.name || selectedUser.id.substring(0,5)).replace(/[^a-zA-Z0-9]/g, '_');
-    
+                    const safeUserName = (selectedUser.name || 'user').replace(/[^a-zA-Z0-9]/g, '_');
+                    const safeCustomerId = selectedUser.customerId.replace(/[^a-zA-Z0-9]/g, '_');
+
                     // Iterate through sheets and only process those belonging to the selected user
                     for (const sheetName of workbook.SheetNames) {
-                        if (sheetName.startsWith(safeUserName)) {
-                            const collectionName = sheetName.substring(safeUserName.length + 1);
+                        const sheetNameIdentifier = `${safeUserName}_${safeCustomerId}_`;
+                        if (sheetName.startsWith(sheetNameIdentifier)) {
+                            const collectionName = sheetName.substring(sheetNameIdentifier.length);
                             const worksheet = workbook.Sheets[sheetName];
                             const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
     
@@ -638,5 +642,3 @@ export default function SettingsPage() {
     </>
   );
 }
-
-    
