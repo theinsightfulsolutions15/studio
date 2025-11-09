@@ -608,25 +608,24 @@ export default function AnimalsPage() {
     {isMobile && renderActionButton()}
 
     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-md max-h-[90svh] flex flex-col">
+        <DialogContent className="sm:max-w-md">
             <DialogHeader>
                 <DialogTitle>{dialogTitles[dialogMode]}</DialogTitle>
                 <DialogDescription>
                     {dialogDescriptions[dialogMode]}
                 </DialogDescription>
             </DialogHeader>
-            <ScrollArea className="pr-4 -mr-6">
-            <div className="grid gap-6 py-4">
+            <div className="grid gap-4 py-4 max-h-[75vh] overflow-y-auto px-1">
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-32 h-32 rounded-md bg-muted flex items-center justify-center overflow-hidden">
                             {capturedImage ? (
-                            <Image src={capturedImage} alt="Animal" width={192} height={192} className="object-cover h-full w-full" />
+                            <Image src={capturedImage} alt="Animal" width={128} height={128} className="object-cover h-full w-full" />
                         ) : (
                             <Camera className="h-12 w-12 text-muted-foreground" />
                         )}
                     </div>
                     {dialogMode !== 'view' && (
-                        <div className="w-full max-w-[200px] grid grid-cols-2 gap-2">
+                        <div className="w-full max-w-[240px] grid grid-cols-2 gap-2">
                             <Button variant="outline" onClick={() => setIsCaptureDialogOpen(true)}>
                                 <Camera className="mr-2 h-4 w-4" />
                                 Capture
@@ -720,8 +719,7 @@ export default function AnimalsPage() {
                     </div>
                 </div>
             </div>
-            </ScrollArea>
-            <DialogFooter className="pt-4 mt-auto">
+            <DialogFooter className="pt-4 border-t">
                 <DialogClose asChild>
                     <Button type="button" variant="secondary">Cancel</Button>
                 </DialogClose>
@@ -815,5 +813,3 @@ export default function AnimalsPage() {
     </>
   );
 }
-
-    
