@@ -109,4 +109,15 @@ export type SystemStatus = {
 export type SystemConfig = {
     appLogo?: string;
 };
+
+export type SupportTicket = {
+    id: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    subject: string;
+    description: string;
+    submittedAt: any; // Firestore Timestamp
+    status: 'Open' | 'Closed';
+};
     

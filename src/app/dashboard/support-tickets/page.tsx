@@ -7,11 +7,85 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from '@/components/ui/card';
-import { useUser } from '@/firebase';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { MoreHorizontal } from 'lucide-react';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import type { SupportTicket } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import { useMemo, useState } from 'react';
+import { format } from 'date-fns';
+
+function TicketRowSkeleton() {
+  return (
+    <TableRow>
+      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+      <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+      <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+      <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+    </TableRow>
+  );
+}
 
 export default function SupportTicketsPage() {
-  const { isAdmin } = useUser();
+  const { isAdmin, isUserLoading } = useUser();
+  const firestore = useFirestore();
+  const { toast } = useToast();
+
+  const ticketsQuery = useMemoFirebase(() => {
+    if (!isAdmin || !firestore) return null;
+    return collection(firestore, 'support_tickets');
+  }, [isAdmin, firestore]);
+
+  const { data: allTickets, isLoading: isLoadingTickets } = useCollection<SupportTicket>(ticketsQuery);
+
+  const openTickets = useMemo(() => allTickets?.filter(t => t.status === 'Open') || [], [allTickets]);
+  const closedTickets = useMemo(() => allTickets?.filter(t => t.status === 'Closed') || [], [allTickets]);
+
+  const handleUpdateStatus = async (ticket: SupportTicket, status: 'Open' | 'Closed') => {
+    if (!firestore) return;
+
+    const ticketDocRef = doc(firestore, 'support_tickets', ticket.id);
+    try {
+      await updateDocumentNonBlocking(ticketDocRef, { status });
+      toast({
+        title: 'Status Updated',
+        description: `Ticket from ${ticket.userName} has been marked as ${status}.`,
+      });
+    } catch (error) {
+      console.error('Error updating ticket status:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Update Failed',
+        description: 'Could not update the ticket status.',
+      });
+    }
+  };
+
+  if (isUserLoading) {
+    return <Card><CardHeader><CardTitle>Loading...</CardTitle></CardHeader></Card>;
+  }
 
   if (!isAdmin) {
     return (
@@ -27,18 +101,123 @@ export default function SupportTicketsPage() {
   }
 
   return (
-    <div className="flex justify-center items-start pt-10">
-      <Card className="w-full max-w-4xl">
-        <CardHeader>
-          <CardTitle>Support Tickets</CardTitle>
-          <CardDescription>
-            This page is under construction.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p>The support ticket functionality has been temporarily removed for redesign.</p>
-        </CardContent>
-      </Card>
-    </div>
+    <Tabs defaultValue="open">
+      <div className="flex items-center">
+        <TabsList>
+          <TabsTrigger value="open">Open</TabsTrigger>
+          <TabsTrigger value="closed">Closed</TabsTrigger>
+        </TabsList>
+      </div>
+      <TabsContent value="open">
+        <Card>
+          <CardHeader>
+            <CardTitle>Open Support Tickets</CardTitle>
+            <CardDescription>Review and manage all pending support requests from users.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TicketsTable
+              tickets={openTickets}
+              isLoading={isLoadingTickets}
+              onUpdateStatus={handleUpdateStatus}
+            />
+          </CardContent>
+          <CardFooter>
+            <div className="text-xs text-muted-foreground">
+              Showing <strong>{openTickets.length}</strong> open tickets.
+            </div>
+          </CardFooter>
+        </Card>
+      </TabsContent>
+      <TabsContent value="closed">
+        <Card>
+          <CardHeader>
+            <CardTitle>Closed Support Tickets</CardTitle>
+            <CardDescription>A history of all resolved support requests.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TicketsTable
+              tickets={closedTickets}
+              isLoading={isLoadingTickets}
+              onUpdateStatus={handleUpdateStatus}
+            />
+          </CardContent>
+           <CardFooter>
+            <div className="text-xs text-muted-foreground">
+              Showing <strong>{closedTickets.length}</strong> closed tickets.
+            </div>
+          </CardFooter>
+        </Card>
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function TicketsTable({
+  tickets,
+  isLoading,
+  onUpdateStatus,
+}: {
+  tickets: SupportTicket[];
+  isLoading: boolean;
+  onUpdateStatus: (ticket: SupportTicket, status: 'Open' | 'Closed') => void;
+}) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Date</TableHead>
+          <TableHead>User</TableHead>
+          <TableHead>Subject</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead><span className="sr-only">Actions</span></TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {isLoading && Array.from({ length: 5 }).map((_, i) => <TicketRowSkeleton key={i} />)}
+        {tickets.map(ticket => (
+          <TableRow key={ticket.id}>
+            <TableCell>{format(ticket.submittedAt.toDate(), 'dd/MM/yyyy')}</TableCell>
+            <TableCell>
+              <div className="font-medium">{ticket.userName}</div>
+              <div className="text-sm text-muted-foreground">{ticket.userEmail}</div>
+            </TableCell>
+            <TableCell>{ticket.subject}</TableCell>
+            <TableCell>
+              <Badge variant={ticket.status === 'Open' ? 'default' : 'secondary'}>
+                {ticket.status}
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="icon" variant="ghost">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {ticket.status === 'Open' && (
+                    <DropdownMenuItem onClick={() => onUpdateStatus(ticket, 'Closed')}>
+                      Mark as Closed
+                    </DropdownMenuItem>
+                  )}
+                  {ticket.status === 'Closed' && (
+                    <DropdownMenuItem onClick={() => onUpdateStatus(ticket, 'Open')}>
+                      Re-open Ticket
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </TableCell>
+          </TableRow>
+        ))}
+        {!isLoading && tickets.length === 0 && (
+          <TableRow>
+            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+              No tickets found in this category.
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
   );
 }
