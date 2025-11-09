@@ -47,10 +47,6 @@ const masterNavItems: NavItem[] = [
     { href: '/dashboard/master/accounts', title: 'Accounts', icon: BookUser },
 ];
 
-const userNavItems: NavItem[] = [
-    { href: '/dashboard/renewal', title: 'AMC Renewal', icon: FileClock },
-];
-
 const adminNavItems: NavItem[] = [
     { href: '/dashboard/users', title: 'Users', icon: Users },
     { href: '/dashboard/user-approvals', title: 'User Approvals', icon: UserCheck, id: 'user-approvals' },
@@ -97,7 +93,7 @@ export default function Nav() {
 
   const navItems = isAdmin 
     ? [...baseNavItems, ...masterNavItems, ...adminNavItems] 
-    : [...baseNavItems, ...masterNavItems, ...userNavItems];
+    : [...baseNavItems, ...masterNavItems];
 
   return (
     <>
