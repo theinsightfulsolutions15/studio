@@ -16,7 +16,7 @@ import {
   UserCheck,
   BookUser,
   BookCopy,
-  FileClock,
+  LifeBuoy,
 } from 'lucide-react';
 import { doc, collection, query, where } from 'firebase/firestore';
 import {
@@ -52,6 +52,12 @@ const adminNavItems: NavItem[] = [
     { href: '/dashboard/user-approvals', title: 'User Approvals', icon: UserCheck, id: 'user-approvals' },
     { href: '/dashboard/amc', title: 'AMC Renewals', icon: ShieldCheck, id: 'amc-renewals' },
 ];
+
+const supportItem: NavItem = {
+    href: '/dashboard/support',
+    title: 'Support',
+    icon: LifeBuoy,
+};
 
 const settingsItem: NavItem = {
   href: '/dashboard/settings',
@@ -133,6 +139,18 @@ export default function Nav() {
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
           <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                    asChild
+                    isActive={pathname === supportItem.href}
+                    tooltip={supportItem.title}
+                >
+                    <Link href={supportItem.href}>
+                        <supportItem.icon />
+                        <span>{supportItem.title}</span>
+                    </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton
                     asChild
