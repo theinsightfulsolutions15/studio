@@ -61,6 +61,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 function AnimalRowSkeleton() {
@@ -606,24 +607,25 @@ export default function AnimalsPage() {
     {isMobile && renderActionButton()}
 
     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-4xl">
+        <DialogContent className="sm:max-w-md max-h-[90svh]">
             <DialogHeader>
                 <DialogTitle>{dialogTitles[dialogMode]}</DialogTitle>
                 <DialogDescription>
                     {dialogDescriptions[dialogMode]}
                 </DialogDescription>
             </DialogHeader>
-            <div className="grid md:grid-cols-3 gap-6 py-4">
-                <div className="md:col-span-1 flex flex-col items-center gap-4">
-                    <div className="w-full aspect-square rounded-md bg-muted flex items-center justify-center overflow-hidden">
+            <ScrollArea className="pr-4 -mr-6">
+            <div className="grid gap-6 py-4">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-48 h-48 rounded-md bg-muted flex items-center justify-center overflow-hidden">
                             {capturedImage ? (
-                            <Image src={capturedImage} alt="Animal" width={400} height={400} className="object-cover h-full w-full" />
+                            <Image src={capturedImage} alt="Animal" width={192} height={192} className="object-cover h-full w-full" />
                         ) : (
                             <Camera className="h-16 w-16 text-muted-foreground" />
                         )}
                     </div>
                     {dialogMode !== 'view' && (
-                        <div className="w-full grid grid-cols-2 gap-2">
+                        <div className="w-48 grid grid-cols-2 gap-2">
                             <Button variant="outline" onClick={() => setIsCaptureDialogOpen(true)}>
                                 <Camera className="mr-2 h-4 w-4" />
                                 Capture
@@ -642,8 +644,8 @@ export default function AnimalsPage() {
                         </div>
                     )}
                 </div>
-                <div className="md:col-span-2 grid gap-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-4">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="type">Type</Label>
                             <Select value={formData.type} onValueChange={(value) => setFormData({...formData, type: value })} disabled={dialogMode === 'view'}>
@@ -717,7 +719,8 @@ export default function AnimalsPage() {
                     </div>
                 </div>
             </div>
-            <DialogFooter>
+            </ScrollArea>
+            <DialogFooter className="pt-4">
                 <DialogClose asChild>
                     <Button type="button" variant="secondary">Cancel</Button>
                 </DialogClose>
