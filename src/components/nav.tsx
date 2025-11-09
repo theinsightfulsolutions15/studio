@@ -101,7 +101,7 @@ export default function Nav() {
 
   return (
     <>
-      <SidebarHeader>
+      <SidebarHeader className="items-center">
         <Logo />
       </SidebarHeader>
       <SidebarContent>
