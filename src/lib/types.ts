@@ -115,9 +115,11 @@ export type SupportTicket = {
     userId: string;
     userName: string;
     userEmail: string;
+    customerId?: string;
     subject: string;
     description: string;
     submittedAt: any; // Firestore Timestamp
     status: 'Open' | 'Closed';
+    closedAt?: any; // Firestore Timestamp
 };
     

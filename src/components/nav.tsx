@@ -30,7 +30,7 @@ import {
   SidebarMenuSkeleton,
   SidebarMenuBadge,
 } from '@/components/ui/sidebar';
-import type { NavItem, User as AppUser, AmcRenewal } from '@/lib/types';
+import type { NavItem, User as AppUser, AmcRenewal, SupportTicket } from '@/lib/types';
 import Logo from './logo';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 
@@ -96,6 +96,13 @@ export default function Nav() {
   const { data: pendingUsers } = useCollection<AppUser>(pendingUsersQuery);
   const pendingUsersCount = pendingUsers?.length ?? 0;
 
+  const openTicketsQuery = useMemoFirebase(() => {
+    if (!isAdmin || !firestore) return null;
+    return query(collection(firestore, 'support_tickets'), where('status', '==', 'Open'));
+  }, [isAdmin, firestore]);
+  const { data: openTickets } = useCollection<SupportTicket>(openTicketsQuery);
+  const openTicketsCount = openTickets?.length ?? 0;
+
 
   const isLoading = isUserLoading || isCurrentUserLoading;
 
@@ -134,6 +141,9 @@ export default function Nav() {
               )}
               {item.id === 'user-approvals' && pendingUsersCount > 0 && (
                 <SidebarMenuBadge>{pendingUsersCount}</SidebarMenuBadge>
+              )}
+              {item.id === 'support-tickets' && openTicketsCount > 0 && (
+                <SidebarMenuBadge>{openTicketsCount}</SidebarMenuBadge>
               )}
             </SidebarMenuItem>
           ))}

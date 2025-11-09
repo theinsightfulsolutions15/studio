@@ -28,13 +28,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MoreHorizontal } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, serverTimestamp } from 'firebase/firestore';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { SupportTicket } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { useMemo, useState } from 'react';
-import { format } from 'date-fns';
+import { useMemo } from 'react';
+import { format, subDays } from 'date-fns';
 
 function TicketRowSkeleton() {
   return (
@@ -60,15 +60,35 @@ export default function SupportTicketsPage() {
 
   const { data: allTickets, isLoading: isLoadingTickets } = useCollection<SupportTicket>(ticketsQuery);
 
-  const openTickets = useMemo(() => allTickets?.filter(t => t.status === 'Open') || [], [allTickets]);
-  const closedTickets = useMemo(() => allTickets?.filter(t => t.status === 'Closed') || [], [allTickets]);
+  const openTickets = useMemo(() => {
+      return allTickets?.filter(t => t.status === 'Open').sort((a,b) => b.submittedAt.toDate() - a.submittedAt.toDate()) || [];
+    }, [allTickets]);
+
+  const closedTickets = useMemo(() => {
+    if (!allTickets) return [];
+    const fifteenDaysAgo = subDays(new Date(), 15);
+    return allTickets.filter(ticket => {
+        if (ticket.status === 'Closed' && ticket.closedAt) {
+            return ticket.closedAt.toDate() > fifteenDaysAgo;
+        }
+        return false;
+    }).sort((a,b) => b.closedAt.toDate() - a.closedAt.toDate());
+  }, [allTickets]);
+
 
   const handleUpdateStatus = async (ticket: SupportTicket, status: 'Open' | 'Closed') => {
     if (!firestore) return;
 
     const ticketDocRef = doc(firestore, 'support_tickets', ticket.id);
+    const updateData: { status: 'Open' | 'Closed'; closedAt?: any } = { status };
+    if (status === 'Closed') {
+      updateData.closedAt = serverTimestamp();
+    } else {
+      updateData.closedAt = null;
+    }
+
     try {
-      await updateDocumentNonBlocking(ticketDocRef, { status });
+      await updateDocumentNonBlocking(ticketDocRef, updateData);
       toast({
         title: 'Status Updated',
         description: `Ticket from ${ticket.userName} has been marked as ${status}.`,
@@ -105,7 +125,7 @@ export default function SupportTicketsPage() {
       <div className="flex items-center">
         <TabsList>
           <TabsTrigger value="open">Open</TabsTrigger>
-          <TabsTrigger value="closed">Closed</TabsTrigger>
+          <TabsTrigger value="closed">Recently Closed</TabsTrigger>
         </TabsList>
       </div>
       <TabsContent value="open">
@@ -131,8 +151,8 @@ export default function SupportTicketsPage() {
       <TabsContent value="closed">
         <Card>
           <CardHeader>
-            <CardTitle>Closed Support Tickets</CardTitle>
-            <CardDescription>A history of all resolved support requests.</CardDescription>
+            <CardTitle>Recently Closed Support Tickets</CardTitle>
+            <CardDescription>A history of support requests closed in the last 15 days.</CardDescription>
           </CardHeader>
           <CardContent>
             <TicketsTable
@@ -176,10 +196,10 @@ function TicketsTable({
         {isLoading && Array.from({ length: 5 }).map((_, i) => <TicketRowSkeleton key={i} />)}
         {tickets.map(ticket => (
           <TableRow key={ticket.id}>
-            <TableCell>{format(ticket.submittedAt.toDate(), 'dd/MM/yyyy')}</TableCell>
+            <TableCell>{ticket.submittedAt ? format(ticket.submittedAt.toDate(), 'dd/MM/yyyy') : '...'}</TableCell>
             <TableCell>
               <div className="font-medium">{ticket.userName}</div>
-              <div className="text-sm text-muted-foreground">{ticket.userEmail}</div>
+              <div className="text-sm text-muted-foreground">{ticket.userEmail} ({ticket.customerId || 'No ID'})</div>
             </TableCell>
             <TableCell>{ticket.subject}</TableCell>
             <TableCell>
