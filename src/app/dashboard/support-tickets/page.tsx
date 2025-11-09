@@ -42,7 +42,7 @@ import {
   DialogDescription,
   DialogFooter
 } from '@/components/ui/dialog';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 function TicketRowSkeleton() {
   return (
@@ -234,5 +234,3 @@ export default function SupportTicketsPage() {
     </>
   );
 }
-
-    
