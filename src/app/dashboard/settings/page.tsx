@@ -41,6 +41,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { User as AppUser, Animal, AnimalMovement, FinancialRecord, MilkRecord, Account } from '@/lib/types';
 import * as XLSX from 'xlsx';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
@@ -202,7 +204,7 @@ export default function SettingsPage() {
     return user_data;
   };
 
-  const handleBackup = async () => {
+ const handleBackup = async () => {
     if (!firestore || !user) {
         toast({ variant: 'destructive', title: 'Backup Failed', description: 'Could not create backup.' });
         return;
@@ -210,35 +212,57 @@ export default function SettingsPage() {
     setIsBackingUp(true);
 
     try {
-        const workbook = XLSX.utils.book_new();
-        
         if (isAdmin) {
+            const zip = new JSZip();
+            const fullBackupWb = XLSX.utils.book_new();
+
             const usersSnapshot = await getDocs(collection(firestore, 'users'));
             const allUsersToBackup = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as AppUser));
 
             const cleanedUsers = cleanDataForExport(allUsersToBackup, ['photoURL']);
             const usersSheet = XLSX.utils.json_to_sheet(cleanedUsers);
-            XLSX.utils.book_append_sheet(workbook, usersSheet, 'All_User_Profiles');
+            XLSX.utils.book_append_sheet(fullBackupWb, usersSheet, 'All_User_Profiles');
 
             for (const u of allUsersToBackup) {
+                const userWb = XLSX.utils.book_new();
                 const userDataToBackup = await fetchDataForUser(u.id);
+                let userHasData = false;
+
                 for (const [colName, data] of Object.entries(userDataToBackup)) {
-                    if(data.length > 0) {
-                      const safeUserName = (u.name || 'user').replace(/[^a-zA-Z0-9]/g, '_');
-                      const safeCustomerId = (u.customerId || u.id.substring(0,5)).replace(/[^a-zA-Z0-9]/g, '_');
-                      const sheetName = `${safeUserName}_${safeCustomerId}_${colName}`.substring(0, 31);
-                      let cleanedData = data;
-                      if(colName === 'animals'){
-                          cleanedData = cleanDataForExport(data, ['imageUrl']);
-                      }
-                      const sheet = XLSX.utils.json_to_sheet(cleanedData);
-                      XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+                    if (data.length > 0) {
+                        userHasData = true;
+                        let cleanedData = data;
+                        if (colName === 'animals') {
+                            cleanedData = cleanDataForExport(data, ['imageUrl']);
+                        }
+                        const sheet = XLSX.utils.json_to_sheet(cleanedData);
+                        // Add to full backup
+                        const safeUserName = (u.name || 'user').replace(/[^a-zA-Z0-9]/g, '_');
+                        const safeCustomerId = (u.customerId || u.id.substring(0,5)).replace(/[^a-zA-Z0-9]/g, '_');
+                        const fullSheetName = `${safeUserName}_${safeCustomerId}_${colName}`.substring(0, 31);
+                        XLSX.utils.book_append_sheet(fullBackupWb, sheet, fullSheetName);
+
+                        // Add to individual user backup
+                        XLSX.utils.book_append_sheet(userWb, XLSX.utils.json_to_sheet(cleanedData), colName);
                     }
                 }
+                 if(userHasData) {
+                    const userWbOut = XLSX.write(userWb, { bookType: 'xlsx', type: 'array' });
+                    const safeUserName = (u.name || 'user').replace(/[^a-zA-Z0-9]/g, '_');
+                    const safeCustomerId = (u.customerId || 'no_id').replace(/[^a-zA-Z0-9]/g, '_');
+                    zip.file(`user_backups/${safeUserName}_${safeCustomerId}.xlsx`, userWbOut);
+                }
             }
-             XLSX.writeFile(workbook, 'NANDI_NET_Full_Backup.xlsx');
+            
+            const fullWbOut = XLSX.write(fullBackupWb, { bookType: 'xlsx', type: 'array' });
+            zip.file('NANDI_NET_Full_Backup.xlsx', fullWbOut);
 
-        } else {
+            zip.generateAsync({ type: 'blob' }).then(content => {
+                saveAs(content, `NANDI_NET_Backup_Collection_${new Date().toISOString().split('T')[0]}.zip`);
+            });
+
+        } else { // Regular user backup
+            const workbook = XLSX.utils.book_new();
             const userDataToBackup = await fetchDataForUser(user.uid);
             
             const cleanedAnimals = cleanDataForExport(userDataToBackup.animals, ['imageUrl']);
@@ -252,7 +276,7 @@ export default function SettingsPage() {
             XLSX.writeFile(workbook, `NANDI_NET_MyData_Backup.xlsx`);
         }
 
-        toast({ title: "Backup Successful", description: "Your data has been exported to an Excel file." });
+        toast({ title: "Backup Successful", description: "Your data has been exported." });
 
     } catch (error) {
         console.error("Backup error:", error);
@@ -483,7 +507,7 @@ export default function SettingsPage() {
                             <p className="font-medium">
                                 {isAdmin ? 'Create a Full System Backup' : 'Create a New Backup'}
                             </p>
-                            <p className="text-sm text-muted-foreground">This will generate an Excel file with all relevant data.</p>
+                            <p className="text-sm text-muted-foreground">{isAdmin ? 'This will generate a ZIP file containing a full backup and individual user files.' : 'This will generate an Excel file with all your relevant data.'}</p>
                         </div>
                         <Button variant="outline" onClick={handleBackup} disabled={isBackingUp || isLoading}>
                             <Download className="mr-2 h-4 w-4" />
