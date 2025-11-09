@@ -643,7 +643,7 @@ export default function AnimalsPage() {
                     )}
                 </div>
                 <div className="md:col-span-2 grid gap-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="type">Type</Label>
                             <Select value={formData.type} onValueChange={(value) => setFormData({...formData, type: value })} disabled={dialogMode === 'view'}>
@@ -664,7 +664,7 @@ export default function AnimalsPage() {
                             <Input id="govtTagNo" value={formData.govtTagNo} onChange={(e) => setFormData({ ...formData, govtTagNo: e.target.value })} placeholder="UID12345" disabled={dialogMode === 'view'} />
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="breed">Breed</Label>
                             <Input id="breed" value={formData.breed} onChange={(e) => setFormData({ ...formData, breed: e.target.value })} placeholder="e.g., Gir, Murrah" disabled={dialogMode === 'view'} />
@@ -674,7 +674,7 @@ export default function AnimalsPage() {
                             <Input id="color" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} placeholder="e.g., Brown, Black" disabled={dialogMode === 'view'} />
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="gender">Gender</Label>
                             <Select value={formData.gender} onValueChange={(value: 'Male' | 'Female') => setFormData({ ...formData, gender: value })} disabled={dialogMode === 'view'}>
@@ -692,7 +692,7 @@ export default function AnimalsPage() {
                             <Input id="yearOfBirth" type="number" value={formData.yearOfBirth} onChange={(e) => setFormData({ ...formData, yearOfBirth: parseInt(e.target.value) })} placeholder="e.g., 2020" disabled={dialogMode === 'view'} />
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="healthStatus">Health Status</Label>
                             <Select value={formData.healthStatus} onValueChange={(value: 'Healthy' | 'Sick' | 'Under Treatment') => setFormData({ ...formData, healthStatus: value })} disabled={dialogMode === 'view'}>
