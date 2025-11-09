@@ -34,7 +34,7 @@ export type User = {
 export type FinancialRecord = {
   id: string;
   date: string;
-  recordType: 'Receipt' | 'Payment' | 'Expense' | 'Milk Record' | 'Bank Record' | 'Milk Sale';
+  recordType: 'Receipt' | 'Payment' | 'Milk Sale';
   category?: string;
   amount: number;
   description: string;
@@ -109,3 +109,5 @@ export type SystemStatus = {
 export type SystemConfig = {
     appLogo?: string;
 };
+
+    
