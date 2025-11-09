@@ -489,5 +489,3 @@
     "reasoning": "The Firestore data structure is designed to support the GauRakshak application by adopting a user-centric model where each user's data (animals, movements, financials, etc.) is nested within their own document. This enhances data privacy and simplifies security rules by leveraging path-based ownership. Top-level collections like 'amc_renewals' and 'roles_admin' are maintained for global operations and administrative functions. Support tickets are also nested under users to ensure data privacy. This structure ensures that users can only access their own data, while admins have broader permissions, creating a secure and scalable architecture."
   }
 }
-
-    

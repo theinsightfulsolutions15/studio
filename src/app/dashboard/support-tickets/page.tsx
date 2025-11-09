@@ -26,7 +26,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, query, orderBy, where } from 'firebase/firestore';
+import { collection, doc, query, orderBy } from 'firebase/firestore';
 import type { SupportTicket, User as AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MoreHorizontal, Inbox } from 'lucide-react';
@@ -236,5 +236,3 @@ export default function SupportTicketsPage() {
     </>
   );
 }
-
-    
