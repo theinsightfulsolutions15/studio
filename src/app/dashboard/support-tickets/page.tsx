@@ -74,6 +74,7 @@ export default function SupportTicketsPage() {
 
   const ticketsQuery = useMemoFirebase(() => {
     if (!isAdmin || !firestore) return null;
+    // Use a collectionGroup query to get all tickets from all users.
     return query(collectionGroup(firestore, 'support_tickets'), orderBy('submittedAt', 'desc'));
   }, [isAdmin, firestore]);
 
@@ -84,6 +85,7 @@ export default function SupportTicketsPage() {
 
   const handleUpdateStatus = async (ticket: SupportTicket, status: 'Open' | 'Closed') => {
     if (!firestore) return;
+    // The path to the ticket is inside the user's subcollection
     const ticketRef = doc(firestore, `users/${ticket.userId}/support_tickets`, ticket.id);
     try {
         await updateDocumentNonBlocking(ticketRef, { status: status });
