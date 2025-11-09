@@ -46,7 +46,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MoreHorizontal, PlusCircle, Search, FileDown, FileUp, Camera, Upload } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Search, FileDown, FileUp, Camera, Upload, Plus } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, doc as firestoreDoc, addDoc } from 'firebase/firestore';
 import type { Animal, AnimalMovement } from '@/lib/types';
@@ -60,6 +60,7 @@ import Image from 'next/image';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 function AnimalRowSkeleton() {
@@ -112,6 +113,7 @@ export default function AnimalsPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<Omit<Animal, 'id' | 'ownerId'>>(initialAnimalState);
@@ -466,6 +468,22 @@ export default function AnimalsPage() {
       view: 'Viewing the details for this animal.'
   };
 
+  const renderActionButton = () => {
+    if (isMobile) {
+        return (
+            <Button size="icon" className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-20" onClick={() => openDialog('create')}>
+                <Plus className="h-6 w-6" />
+                <span className="sr-only">Register Animal</span>
+            </Button>
+        );
+    }
+    return (
+        <Button className="w-auto" onClick={() => openDialog('create')}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Register Animal
+        </Button>
+    );
+  }
 
   return (
     <>
@@ -501,10 +519,7 @@ export default function AnimalsPage() {
                     <FileDown className="mr-2 h-4 w-4" />
                     Export
                 </Button>
-                <Button className="w-auto" onClick={() => openDialog('create')}>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Register Animal
-                </Button>
+                {!isMobile && renderActionButton()}
             </div>
         </div>
       </CardHeader>
@@ -588,6 +603,7 @@ export default function AnimalsPage() {
         </div>
       </CardFooter>
     </Card>
+    {isMobile && renderActionButton()}
 
     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-4xl">
