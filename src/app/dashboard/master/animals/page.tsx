@@ -139,7 +139,8 @@ export default function AnimalsPage() {
     if (isCaptureDialogOpen) {
       const getCameraPermission = async () => {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          // Request the rear-facing camera
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
           setHasCameraPermission(true);
 
           if (videoRef.current) {
@@ -607,7 +608,7 @@ export default function AnimalsPage() {
     {isMobile && renderActionButton()}
 
     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-md max-h-[90svh]">
+        <DialogContent className="sm:max-w-md max-h-[90svh] flex flex-col">
             <DialogHeader>
                 <DialogTitle>{dialogTitles[dialogMode]}</DialogTitle>
                 <DialogDescription>
@@ -617,15 +618,15 @@ export default function AnimalsPage() {
             <ScrollArea className="pr-4 -mr-6">
             <div className="grid gap-6 py-4">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="w-48 h-48 rounded-md bg-muted flex items-center justify-center overflow-hidden">
+                    <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-md bg-muted flex items-center justify-center overflow-hidden">
                             {capturedImage ? (
                             <Image src={capturedImage} alt="Animal" width={192} height={192} className="object-cover h-full w-full" />
                         ) : (
-                            <Camera className="h-16 w-16 text-muted-foreground" />
+                            <Camera className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground" />
                         )}
                     </div>
                     {dialogMode !== 'view' && (
-                        <div className="w-48 grid grid-cols-2 gap-2">
+                        <div className="w-32 sm:w-48 grid grid-cols-2 gap-2">
                             <Button variant="outline" onClick={() => setIsCaptureDialogOpen(true)}>
                                 <Camera className="mr-2 h-4 w-4" />
                                 Capture
@@ -720,7 +721,7 @@ export default function AnimalsPage() {
                 </div>
             </div>
             </ScrollArea>
-            <DialogFooter className="pt-4">
+            <DialogFooter className="pt-4 mt-auto">
                 <DialogClose asChild>
                     <Button type="button" variant="secondary">Cancel</Button>
                 </DialogClose>
