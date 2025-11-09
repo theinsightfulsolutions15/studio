@@ -111,18 +111,6 @@ service cloud.firestore {
      match /{path=**}/financial_records/{financialRecordId} {
       allow get, list: if isAdmin();
     }
-    
-    /**
-     * Rules for the top-level support tickets collection.
-     */
-    match /support_tickets/{ticketId} {
-      // A user can create a ticket for themselves.
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      // A user can read their own tickets by querying for their userId.
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      // An admin can manage all tickets.
-      allow read, write, list: if isAdmin();
-    }
 
     /**
      * Rules for AMC renewal requests (top-level collection).

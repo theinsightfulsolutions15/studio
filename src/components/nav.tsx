@@ -16,8 +16,6 @@ import {
   UserCheck,
   BookUser,
   BookCopy,
-  LifeBuoy,
-  Ticket,
 } from 'lucide-react';
 import { doc, collection, query, where } from 'firebase/firestore';
 import {
@@ -30,7 +28,7 @@ import {
   SidebarMenuSkeleton,
   SidebarMenuBadge,
 } from '@/components/ui/sidebar';
-import type { NavItem, User as AppUser, AmcRenewal, SupportTicket } from '@/lib/types';
+import type { NavItem, User as AppUser, AmcRenewal } from '@/lib/types';
 import Logo from './logo';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 
@@ -52,14 +50,7 @@ const adminNavItems: NavItem[] = [
     { href: '/dashboard/users', title: 'Users', icon: Users },
     { href: '/dashboard/user-approvals', title: 'User Approvals', icon: UserCheck, id: 'user-approvals' },
     { href: '/dashboard/amc', title: 'AMC Renewals', icon: ShieldCheck, id: 'amc-renewals' },
-    { href: '/dashboard/support-tickets', title: 'Support Tickets', icon: Ticket, id: 'support-tickets' },
 ];
-
-const supportItem: NavItem = {
-    href: '/dashboard/support',
-    title: 'Support',
-    icon: LifeBuoy,
-};
 
 const settingsItem: NavItem = {
   href: '/dashboard/settings',
@@ -95,13 +86,6 @@ export default function Nav() {
   }, [isAdmin, firestore]);
   const { data: pendingUsers } = useCollection<AppUser>(pendingUsersQuery);
   const pendingUsersCount = pendingUsers?.length ?? 0;
-  
-  const openTicketsQuery = useMemoFirebase(() => {
-    if (!isAdmin || !firestore) return null;
-    return query(collection(firestore, 'support_tickets'), where('status', '==', 'Open'));
-  }, [isAdmin, firestore]);
-  const { data: openTickets } = useCollection<SupportTicket>(openTicketsQuery);
-  const openTicketsCount = openTickets?.length ?? 0;
 
 
   const isLoading = isUserLoading || isCurrentUserLoading;
@@ -142,27 +126,12 @@ export default function Nav() {
               {item.id === 'user-approvals' && pendingUsersCount > 0 && (
                 <SidebarMenuBadge>{pendingUsersCount}</SidebarMenuBadge>
               )}
-              {item.id === 'support-tickets' && openTicketsCount > 0 && (
-                <SidebarMenuBadge>{openTicketsCount}</SidebarMenuBadge>
-              )}
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
           <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                    asChild
-                    isActive={pathname === supportItem.href}
-                    tooltip={supportItem.title}
-                >
-                    <Link href={supportItem.href}>
-                        <supportItem.icon />
-                        <span>{supportItem.title}</span>
-                    </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton
                     asChild
@@ -180,5 +149,3 @@ export default function Nav() {
     </>
   );
 }
-
-    

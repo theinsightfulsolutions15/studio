@@ -308,23 +308,6 @@
                 "description": "A Base64 encoded data URL of the application logo."
             }
         }
-    },
-    "SupportTicket": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "SupportTicket",
-      "type": "object",
-      "description": "Represents a support ticket submitted by a user.",
-      "properties": {
-        "id": { "type": "string", "description": "Unique identifier for the support ticket." },
-        "userId": { "type": "string", "description": "ID of the user who submitted the ticket." },
-        "userName": { "type": "string", "description": "Name of the user at the time of submission." },
-        "userEmail": { "type": "string", "format": "email", "description": "Email of the user at the time of submission." },
-        "subject": { "type": "string", "description": "Subject of the support ticket." },
-        "description": { "type": "string", "description": "Detailed description of the issue." },
-        "submittedAt": { "type": "string", "format": "date-time", "description": "Timestamp when the ticket was submitted." },
-        "status": { "type": "string", "enum": ["Open", "Closed"], "description": "The current status of the ticket." }
-      },
-      "required": ["id", "userId", "userName", "userEmail", "subject", "description", "submittedAt", "status"]
     }
   },
   "auth": {
@@ -427,17 +410,6 @@
                 { "name": "userId", "description": "The unique ID of the user." },
                 { "name": "accountId", "description": "The unique ID for the account." }
             ]
-        }
-      },
-      {
-        "path": "/support_tickets/{ticketId}",
-        "definition": {
-          "entityName": "SupportTicket",
-          "schema": { "$ref": "#/backend/entities/SupportTicket" },
-          "description": "Stores all support tickets submitted by users. Writable by the ticket owner, fully manageable by admins.",
-          "params": [
-            { "name": "ticketId", "description": "The unique ID for the support ticket." }
-          ]
         }
       },
       {
