@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { doc, collection, addDoc, query, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import type { User as AppUser, SupportTicket } from '@/lib/types';
@@ -22,23 +22,33 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { LifeBuoy, FileClock } from 'lucide-react';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { format } from 'date-fns';
+import { useRouter } from 'next/navigation';
 
-function SubmittedTicket({ ticket }: { ticket: SupportTicket }) {
+function SubmittedTicket({ ticket, onAcknowledge }: { ticket: SupportTicket, onAcknowledge: () => void }) {
+    const isClosed = ticket.status === 'Closed';
+
     return (
         <div className="flex justify-center items-start pt-10">
             <Card className="w-full max-w-2xl">
                 <CardHeader className="text-center">
                     <FileClock className="mx-auto h-12 w-12 text-primary" />
-                    <CardTitle className="mt-4">You Have a Pending Ticket</CardTitle>
+                    <CardTitle className="mt-4">{isClosed ? 'Your Ticket is Closed' : 'You Have a Pending Ticket'}</CardTitle>
                     <CardDescription>
-                        Your previous support request is currently being reviewed by our team.
+                        {isClosed 
+                            ? 'Your support request has been reviewed and closed by an administrator.'
+                            : 'Your previous support request is currently being reviewed by our team.'
+                        }
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="text-sm">
                     <div className="border rounded-lg p-4 space-y-3 bg-muted/50">
                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Status:</span>
+                            <span className="font-medium">{ticket.status}</span>
+                        </div>
+                         <div className="flex justify-between">
                             <span className="text-muted-foreground">Submission Date:</span>
-                            <span className="font-medium">{format(ticket.submittedAt.toDate(), 'dd/MM/yyyy')}</span>
+                            <span className="font-medium">{ticket.submittedAt ? format(ticket.submittedAt.toDate(), 'dd/MM/yyyy') : 'N/A'}</span>
                         </div>
                          <div className="flex justify-between">
                             <span className="text-muted-foreground">Subject:</span>
@@ -50,9 +60,19 @@ function SubmittedTicket({ ticket }: { ticket: SupportTicket }) {
                         </div>
                     </div>
                      <p className="mt-4 text-center text-muted-foreground">
-                        You will be notified once your request has been actioned. You can only have one open ticket at a time.
+                        {isClosed 
+                            ? 'If your issue is not resolved, you can now submit a new ticket.'
+                            : 'You will be notified once your request has been actioned. You can only have one open ticket at a time.'
+                        }
                     </p>
                 </CardContent>
+                <CardFooter>
+                    {isClosed && (
+                         <Button className="w-full sm:w-auto ml-auto" onClick={onAcknowledge}>
+                            Submit a New Ticket
+                        </Button>
+                    )}
+                </CardFooter>
             </Card>
         </div>
     )
@@ -62,6 +82,7 @@ export default function SupportPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
 
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
@@ -73,16 +94,16 @@ export default function SupportPage() {
   }, [user, firestore]);
   const { data: userData, isLoading: isUserDataLoading } = useDoc<AppUser>(userDocRef);
 
-  const openTicketsQuery = useMemoFirebase(() => {
+  const ticketsQuery = useMemoFirebase(() => {
       if(!user || !firestore) return null;
       return query(
           collection(firestore, 'support_tickets'),
-          where('userId', '==', user.uid),
-          where('status', '==', 'Open')
+          where('userId', '==', user.uid)
       );
   }, [user, firestore]);
-  const { data: openTickets, isLoading: isLoadingTickets } = useCollection<SupportTicket>(openTicketsQuery);
-  const existingOpenTicket = openTickets?.[0];
+  
+  const { data: userTickets, isLoading: isLoadingTickets } = useCollection<SupportTicket>(ticketsQuery);
+  const latestTicket = userTickets?.sort((a,b) => b.submittedAt.toDate() - a.submittedAt.toDate())[0];
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -112,12 +133,12 @@ export default function SupportPage() {
         userEmail: userData.email,
         subject: subject,
         description: description,
-        submittedAt: serverTimestamp(),
+        submittedAt: new Date(),
         status: 'Open',
     };
 
     try {
-        await addDoc(collection(firestore, 'support_tickets'), ticketData);
+        await addDocumentNonBlocking(collection(firestore, 'support_tickets'), ticketData);
         toast({
             title: 'Support Request Submitted',
             description: 'Thank you for your feedback. Our team will get back to you shortly.',
@@ -135,6 +156,16 @@ export default function SupportPage() {
         setIsSubmitting(false);
     }
   };
+
+  const handleAcknowledgeClosedTicket = () => {
+    // This is a dummy function to re-render and show the form again.
+    // The logic to display the form is already handled by the state of `latestTicket`.
+    // We just need a way to trigger a re-render that makes `latestTicket` no longer "Closed" for the purpose of the UI.
+    // A better approach would be to have a local state, but for now we can just force a refresh.
+     router.refresh();
+     // In a real scenario, you might want to archive the ticket client-side or have a better state management.
+     // Forcing a re-fetch of the collection will work.
+  }
 
   const isLoading = isUserLoading || isUserDataLoading || isLoadingTickets;
 
@@ -167,9 +198,16 @@ export default function SupportPage() {
       )
   }
 
-  if (existingOpenTicket) {
-      return <SubmittedTicket ticket={existingOpenTicket} />;
+  if (latestTicket && latestTicket.status !== 'Closed') {
+      return <SubmittedTicket ticket={latestTicket} onAcknowledge={handleAcknowledgeClosedTicket} />;
   }
+   if (latestTicket && latestTicket.status === 'Closed') {
+      // Find the *next* most recent ticket. If it's open, show it. Otherwise, show the form.
+      const openTicket = userTickets?.find(t => t.id !== latestTicket.id && t.status === 'Open');
+      if (openTicket) {
+        return <SubmittedTicket ticket={openTicket} onAcknowledge={handleAcknowledgeClosedTicket} />;
+      }
+   }
 
 
   return (
