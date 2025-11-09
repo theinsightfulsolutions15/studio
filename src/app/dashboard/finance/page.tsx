@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { PlusCircle, ChevronsUpDown, Check, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, ChevronsUpDown, Check, MoreHorizontal, Plus } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, writeBatch, doc } from 'firebase/firestore';
@@ -54,6 +54,7 @@ import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from '
 import { cn } from '@/lib/utils';
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { format } from 'date-fns';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 function TransactionRowSkeleton() {
@@ -103,6 +104,7 @@ export default function FinancePage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState<Omit<FinancialRecord, 'id' | 'ownerId'>>(initialFormState);
@@ -286,6 +288,23 @@ export default function FinancePage() {
         </div>
     );
   };
+  
+  const renderActionButton = () => {
+    if (isMobile) {
+        return (
+            <Button size="icon" className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-20" onClick={() => handleOpenDialog('create')}>
+                <Plus className="h-6 w-6" />
+                <span className="sr-only">Add Transaction</span>
+            </Button>
+        );
+    }
+    return (
+        <Button onClick={() => handleOpenDialog('create')}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add Transaction
+        </Button>
+    );
+  }
 
 
   return (
@@ -299,10 +318,7 @@ export default function FinancePage() {
               Track all receipts and payments.
             </CardDescription>
           </div>
-          <Button onClick={() => handleOpenDialog('create')}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Transaction
-          </Button>
+          {!isMobile && renderActionButton()}
         </div>
       </CardHeader>
       <CardContent>
@@ -330,6 +346,8 @@ export default function FinancePage() {
         </div>
       </CardFooter>
     </Card>
+    
+    {isMobile && renderActionButton()}
 
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -487,5 +505,7 @@ function TransactionsTable({
     </Table>
   );
 }
+
+    
 
     
