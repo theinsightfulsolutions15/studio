@@ -9,80 +9,34 @@ import {
   CardTitle,
   CardFooter,
 } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, addDoc, query, where, orderBy } from 'firebase/firestore';
+import { useUser, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { collection, addDoc, query, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import type { User as AppUser, SupportTicket } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LifeBuoy, FileClock } from 'lucide-react';
+import { LifeBuoy, Inbox } from 'lucide-react';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { format } from 'date-fns';
-import { useRouter } from 'next/navigation';
+import { Badge } from '@/components/ui/badge';
 
-function SubmittedTicket({ ticket, onAcknowledge }: { ticket: SupportTicket, onAcknowledge: () => void }) {
-    const isClosed = ticket.status === 'Closed';
-
-    return (
-        <div className="flex justify-center items-start pt-10">
-            <Card className="w-full max-w-2xl">
-                <CardHeader className="text-center">
-                    <FileClock className="mx-auto h-12 w-12 text-primary" />
-                    <CardTitle className="mt-4">{isClosed ? 'Your Ticket is Closed' : 'You Have a Pending Ticket'}</CardTitle>
-                    <CardDescription>
-                        {isClosed 
-                            ? 'Your support request has been reviewed and closed by an administrator.'
-                            : 'Your previous support request is currently being reviewed by our team.'
-                        }
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="text-sm">
-                    <div className="border rounded-lg p-4 space-y-3 bg-muted/50">
-                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">Status:</span>
-                            <span className="font-medium">{ticket.status}</span>
-                        </div>
-                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">Submission Date:</span>
-                            <span className="font-medium">{ticket.submittedAt ? format(ticket.submittedAt.toDate(), 'dd/MM/yyyy') : 'N/A'}</span>
-                        </div>
-                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">Subject:</span>
-                            <span className="font-medium">{ticket.subject}</span>
-                        </div>
-                        <div className="flex flex-col space-y-1">
-                            <span className="text-muted-foreground">Description:</span>
-                            <p className="font-medium whitespace-pre-wrap">{ticket.description}</p>
-                        </div>
-                    </div>
-                     <p className="mt-4 text-center text-muted-foreground">
-                        {isClosed 
-                            ? 'If your issue is not resolved, you can now submit a new ticket.'
-                            : 'You will be notified once your request has been actioned. You can only have one open ticket at a time.'
-                        }
-                    </p>
-                </CardContent>
-                <CardFooter>
-                    {isClosed && (
-                         <Button className="w-full sm:w-auto ml-auto" onClick={onAcknowledge}>
-                            Submit a New Ticket
-                        </Button>
-                    )}
-                </CardFooter>
-            </Card>
-        </div>
-    )
-}
 
 export default function SupportPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const router = useRouter();
 
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
@@ -103,7 +57,6 @@ export default function SupportPage() {
   }, [user, firestore]);
   
   const { data: userTickets, isLoading: isLoadingTickets } = useCollection<SupportTicket>(ticketsQuery);
-  const latestTicket = userTickets?.[0];
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -158,96 +111,119 @@ export default function SupportPage() {
     }
   };
 
-  const handleAcknowledgeClosedTicket = () => {
-     router.refresh();
-  }
-
   const isLoading = isUserLoading || isUserDataLoading || isLoadingTickets;
-
-  if (isLoading) {
-      return (
-        <div className="flex justify-center items-start pt-10">
-            <Card className="w-full max-w-3xl">
-                <CardHeader>
-                    <div className="flex items-start gap-4">
-                        <Skeleton className="h-14 w-14 rounded-full" />
-                        <div className="space-y-2">
-                           <Skeleton className="h-6 w-48" />
-                           <Skeleton className="h-4 w-full" />
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="grid gap-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2"><Label>Your Name</Label><Skeleton className="h-10 w-full" /></div>
-                        <div className="space-y-2"><Label>Your Email</Label><Skeleton className="h-10 w-full" /></div>
-                    </div>
-                    <div className="space-y-2"><Label>Subject</Label><Skeleton className="h-10 w-full" /></div>
-                    <div className="space-y-2"><Label>Description</Label><Skeleton className="h-24 w-full" /></div>
-                </CardContent>
-                 <CardFooter>
-                    <Skeleton className="h-10 w-36 ml-auto" />
-                </CardFooter>
-            </Card>
-        </div>
-      )
-  }
-
-  if (latestTicket && latestTicket.status !== 'Closed') {
-      return <SubmittedTicket ticket={latestTicket} onAcknowledge={handleAcknowledgeClosedTicket} />;
-  }
-   if (latestTicket && latestTicket.status === 'Closed') {
-      const openTicket = userTickets?.find(t => t.id !== latestTicket.id && t.status === 'Open');
-      if (openTicket) {
-        return <SubmittedTicket ticket={openTicket} onAcknowledge={handleAcknowledgeClosedTicket} />;
-      }
-   }
 
 
   return (
     <div className="flex justify-center items-start pt-10">
-        <Card className="w-full max-w-3xl">
-            <form onSubmit={handleSubmit}>
+        <div className="w-full max-w-3xl space-y-6">
+            <Card>
+                <form onSubmit={handleSubmit}>
+                    <CardHeader>
+                        <div className="flex items-start gap-4">
+                            <div className="bg-primary/10 text-primary p-3 rounded-full">
+                            <LifeBuoy className="h-8 w-8" />
+                            </div>
+                            <div>
+                                <CardTitle>Contact Support</CardTitle>
+                                <CardDescription>
+                                    Having an issue? Fill out the form below and our team will get back to you as soon as possible.
+                                </CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="grid gap-6">
+                         {isLoading ? (
+                             <div className="grid gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-2"><Label>Your Name</Label><Skeleton className="h-10 w-full" /></div>
+                                    <div className="space-y-2"><Label>Your Email</Label><Skeleton className="h-10 w-full" /></div>
+                                </div>
+                                <div className="space-y-2"><Label>Subject</Label><Skeleton className="h-10 w-full" /></div>
+                                <div className="space-y-2"><Label>Description</Label><Skeleton className="h-24 w-full" /></div>
+                            </div>
+                         ) : (
+                             <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="name">Your Name</Label>
+                                    <Input id="name" value={userData?.name || ''} disabled />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="email">Your Email</Label>
+                                    <Input id="email" type="email" value={userData?.email || ''} disabled />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="subject">Subject</Label>
+                                <Input id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g., Issue with milk records" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="description">Describe your issue</Label>
+                                <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Please provide as much detail as possible..." className="min-h-[150px]" />
+                            </div>
+                             </>
+                         )}
+                    </CardContent>
+                    <CardFooter>
+                        <Button type="submit" className="w-full sm:w-auto ml-auto" disabled={isLoading || isSubmitting}>
+                            {isSubmitting ? 'Submitting...' : 'Submit Request'}
+                        </Button>
+                    </CardFooter>
+                </form>
+            </Card>
+
+            <Card>
                 <CardHeader>
-                    <div className="flex items-start gap-4">
-                        <div className="bg-primary/10 text-primary p-3 rounded-full">
-                           <LifeBuoy className="h-8 w-8" />
-                        </div>
-                        <div>
-                            <CardTitle>Contact Support</CardTitle>
-                            <CardDescription>
-                                Having an issue? Fill out the form below and our team will get back to you as soon as possible.
-                            </CardDescription>
-                        </div>
-                    </div>
+                    <CardTitle>Your Ticket History</CardTitle>
+                    <CardDescription>A list of your submitted support requests.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Your Name</Label>
-                            <Input id="name" value={userData?.name || ''} disabled />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Your Email</Label>
-                            <Input id="email" type="email" value={userData?.email || ''} disabled />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="subject">Subject</Label>
-                        <Input id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g., Issue with milk records" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="description">Describe your issue</Label>
-                        <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Please provide as much detail as possible..." className="min-h-[150px]" />
-                    </div>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Subject</TableHead>
+                                <TableHead>Status</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading && (
+                                <TableRow>
+                                    <TableCell colSpan={3} className="h-24 text-center">
+                                        <Skeleton className="h-4 w-1/2 mx-auto" />
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {!isLoading && userTickets && userTickets.length > 0 ? (
+                                userTickets.map((ticket) => (
+                                    <TableRow key={ticket.id}>
+                                        <TableCell>{ticket.submittedAt ? format(ticket.submittedAt.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                                        <TableCell className="font-medium">{ticket.subject}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={ticket.status === 'Open' ? 'destructive' : 'secondary'}>
+                                                {ticket.status}
+                                            </Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                !isLoading && (
+                                <TableRow>
+                                    <TableCell colSpan={3} className="h-24 text-center">
+                                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                            <Inbox className="h-8 w-8" />
+                                            You haven't submitted any tickets yet.
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                                )
+                            )}
+                        </TableBody>
+                    </Table>
                 </CardContent>
-                <CardFooter>
-                    <Button type="submit" className="w-full sm:w-auto ml-auto" disabled={isLoading || isSubmitting}>
-                        {isSubmitting ? 'Submitting...' : 'Submit Request'}
-                    </Button>
-                </CardFooter>
-            </form>
-        </Card>
+            </Card>
+        </div>
     </div>
   );
 }
