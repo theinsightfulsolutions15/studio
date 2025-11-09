@@ -85,7 +85,9 @@ export default function LoginPage() {
         return;
     }
     setIsVerifying(true); // Show loading state immediately
-    initiateEmailSignIn(auth, email, password);
+    initiateEmailSignIn(auth, email, password, () => {
+        setIsVerifying(false); // On error, stop verifying
+    });
   };
 
   if (isVerifying) {
