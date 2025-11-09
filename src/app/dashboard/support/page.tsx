@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, addDoc, query, where } from 'firebase/firestore';
+import { doc, collection, addDoc, query, where, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import type { User as AppUser, SupportTicket } from '@/lib/types';
@@ -97,13 +97,13 @@ export default function SupportPage() {
   const ticketsQuery = useMemoFirebase(() => {
       if(!user || !firestore) return null;
       return query(
-          collection(firestore, 'support_tickets'),
-          where('userId', '==', user.uid)
+          collection(firestore, `users/${user.uid}/support_tickets`),
+          orderBy('submittedAt', 'desc')
       );
   }, [user, firestore]);
   
   const { data: userTickets, isLoading: isLoadingTickets } = useCollection<SupportTicket>(ticketsQuery);
-  const latestTicket = userTickets?.sort((a,b) => b.submittedAt.toDate() - a.submittedAt.toDate())[0];
+  const latestTicket = userTickets?.[0];
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,7 +138,8 @@ export default function SupportPage() {
     };
 
     try {
-        await addDocumentNonBlocking(collection(firestore, 'support_tickets'), ticketData);
+        const ticketsColRef = collection(firestore, `users/${user.uid}/support_tickets`);
+        await addDocumentNonBlocking(ticketsColRef, ticketData);
         toast({
             title: 'Support Request Submitted',
             description: 'Thank you for your feedback. Our team will get back to you shortly.',
@@ -158,13 +159,7 @@ export default function SupportPage() {
   };
 
   const handleAcknowledgeClosedTicket = () => {
-    // This is a dummy function to re-render and show the form again.
-    // The logic to display the form is already handled by the state of `latestTicket`.
-    // We just need a way to trigger a re-render that makes `latestTicket` no longer "Closed" for the purpose of the UI.
-    // A better approach would be to have a local state, but for now we can just force a refresh.
      router.refresh();
-     // In a real scenario, you might want to archive the ticket client-side or have a better state management.
-     // Forcing a re-fetch of the collection will work.
   }
 
   const isLoading = isUserLoading || isUserDataLoading || isLoadingTickets;
@@ -202,7 +197,6 @@ export default function SupportPage() {
       return <SubmittedTicket ticket={latestTicket} onAcknowledge={handleAcknowledgeClosedTicket} />;
   }
    if (latestTicket && latestTicket.status === 'Closed') {
-      // Find the *next* most recent ticket. If it's open, show it. Otherwise, show the form.
       const openTicket = userTickets?.find(t => t.id !== latestTicket.id && t.status === 'Open');
       if (openTicket) {
         return <SubmittedTicket ticket={openTicket} onAcknowledge={handleAcknowledgeClosedTicket} />;

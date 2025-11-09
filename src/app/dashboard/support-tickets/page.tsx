@@ -26,7 +26,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, query, orderBy, where } from 'firebase/firestore';
+import { collection, doc, query, orderBy, where, collectionGroup } from 'firebase/firestore';
 import type { SupportTicket, User as AppUser } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MoreHorizontal, Ticket, Inbox } from 'lucide-react';
@@ -74,7 +74,7 @@ export default function SupportTicketsPage() {
 
   const ticketsQuery = useMemoFirebase(() => {
     if (!isAdmin || !firestore) return null;
-    return query(collection(firestore, 'support_tickets'), orderBy('submittedAt', 'desc'));
+    return query(collectionGroup(firestore, 'support_tickets'), orderBy('submittedAt', 'desc'));
   }, [isAdmin, firestore]);
 
   const { data: allTickets, isLoading: isLoadingTickets } = useCollection<SupportTicket>(ticketsQuery);
@@ -84,7 +84,7 @@ export default function SupportTicketsPage() {
 
   const handleUpdateStatus = async (ticket: SupportTicket, status: 'Open' | 'Closed') => {
     if (!firestore) return;
-    const ticketRef = doc(firestore, 'support_tickets', ticket.id);
+    const ticketRef = doc(firestore, `users/${ticket.userId}/support_tickets`, ticket.id);
     try {
         await updateDocumentNonBlocking(ticketRef, { status: status });
         toast({
@@ -132,7 +132,7 @@ export default function SupportTicketsPage() {
       <TableBody>
         {tickets.map(ticket => (
           <TableRow key={ticket.id}>
-            <TableCell>{format(ticket.submittedAt.toDate(), 'dd/MM/yyyy')}</TableCell>
+            <TableCell>{ticket.submittedAt ? format(ticket.submittedAt.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
             <TableCell>
               <div className="font-medium">{ticket.userName}</div>
               <div className="text-sm text-muted-foreground">{ticket.userEmail}</div>
@@ -209,7 +209,7 @@ export default function SupportTicketsPage() {
           <DialogHeader>
             <DialogTitle>Ticket from {selectedTicket?.userName}</DialogTitle>
             <DialogDescription>
-                Submitted {selectedTicket && formatDistanceToNow(selectedTicket.submittedAt.toDate(), { addSuffix: true })}
+                Submitted {selectedTicket && selectedTicket.submittedAt && formatDistanceToNow(selectedTicket.submittedAt.toDate(), { addSuffix: true })}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
