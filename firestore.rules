@@ -121,6 +121,16 @@ service cloud.firestore {
       // Admins can read, list, update, or delete renewal requests.
       allow read, list, update, delete: if isAdmin();
     }
+    
+    /**
+     * Rules for support tickets (top-level collection).
+     */
+    match /support_tickets/{ticketId} {
+      // Users can create their own support tickets.
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // Admins can read, list, update, or delete tickets.
+      allow read, list, update, delete: if isAdmin();
+    }
 
     /**
      * Rules for admin roles collection.
@@ -144,3 +154,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
