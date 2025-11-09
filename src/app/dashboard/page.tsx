@@ -1,12 +1,15 @@
 
 'use client';
 
-import { useAuth, useCollection, useMemoFirebase, useDoc, useFirestore, useUser, useFirebase } from '@/firebase';
+import { useCollection, useMemoFirebase, useFirestore, useUser, useFirebase } from '@/firebase';
 import { collection, doc, query, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import type { Animal, MilkRecord, FinancialRecord, User as AppUser, AmcRenewal } from '@/lib/types';
-import { Users, UserCheck, UserPlus, ShieldCheck } from 'lucide-react';
+import { Users, UserCheck, UserPlus, ShieldCheck, Droplets, IndianRupee, Beef } from 'lucide-react';
+import { useMemo } from 'react';
+import { format, isSameDay, isSameMonth, startOfMonth } from 'date-fns';
+
 
 function StatCard({ title, value, icon: Icon, description }: { title: string, value: number | string, icon: React.ElementType, description?: string }) {
     return (
@@ -73,18 +76,50 @@ function UserDashboard() {
 
     const animalsQuery = useMemoFirebase(() => (firestore && user ? collection(firestore, `users/${user.uid}/animals`) : null), [firestore, user]);
     const milkRecordsQuery = useMemoFirebase(() => (firestore && user ? collection(firestore, `users/${user.uid}/milk_records`) : null), [firestore, user]);
-    const financialRecordsQuery = useMemoFirebase(() => (firestore && user ? collection(firestore, `users/${user.uid}/financial_records`) : null), [firestore, user]);
+    const financialRecordsQuery = useMemoFirebase(() => (firestore && user ? query(collection(firestore, `users/${user.uid}/financial_records`), where('recordType', '==', 'Milk Sale')) : null), [firestore, user]);
 
     const { data: animals, isLoading: isLoadingAnimals } = useCollection<Animal>(animalsQuery);
     const { data: milkRecords, isLoading: isLoadingMilk } = useCollection<MilkRecord>(milkRecordsQuery);
     const { data: financialRecords, isLoading: isLoadingFinancial } = useCollection<FinancialRecord>(financialRecordsQuery);
 
+    const today = new Date();
+    const firstDayOfMonth = startOfMonth(today);
+
+    const { todayProduction, monthProduction } = useMemo(() => {
+        if (!milkRecords) return { todayProduction: 0, monthProduction: 0 };
+        return milkRecords.reduce((acc, record) => {
+            const recordDate = new Date(record.date);
+            if (isSameDay(recordDate, today)) {
+                acc.todayProduction += record.quantity;
+            }
+            if (isSameMonth(recordDate, today)) {
+                acc.monthProduction += record.quantity;
+            }
+            return acc;
+        }, { todayProduction: 0, monthProduction: 0 });
+    }, [milkRecords, today]);
+
+    const { todaySales, monthSales } = useMemo(() => {
+        if (!financialRecords) return { todaySales: 0, monthSales: 0 };
+        return financialRecords.reduce((acc, record) => {
+            const recordDate = new Date(record.date);
+            if (isSameDay(recordDate, today)) {
+                acc.todaySales += record.amount;
+            }
+            if (isSameMonth(recordDate, today)) {
+                acc.monthSales += record.amount;
+            }
+            return acc;
+        }, { todaySales: 0, monthSales: 0 });
+    }, [financialRecords, today]);
+
+
     const isLoading = isLoadingAnimals || isLoadingMilk || isLoadingFinancial;
 
      if (isLoading) {
         return (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, i) => (
               <Card key={i}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium"><Spinner /></CardTitle>
@@ -99,10 +134,12 @@ function UserDashboard() {
     }
 
     return (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <StatCard title="Total Animals" value={animals?.length ?? 0} icon={Users} />
-          <StatCard title="Milk Records" value={milkRecords?.length ?? 0} icon={Users} />
-          <StatCard title="Financial Records" value={financialRecords?.length ?? 0} icon={Users} />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <StatCard title="Total Animals" value={animals?.length ?? 0} icon={Beef} description="Total animals in your gaushala" />
+          <StatCard title="Today's Production" value={`${todayProduction.toFixed(2)} L`} icon={Droplets} description={`Total milk collected today`} />
+          <StatCard title="Monthly Production" value={`${monthProduction.toFixed(2)} L`} icon={Droplets} description={`Since ${format(firstDayOfMonth, "MMM dd")}`} />
+          <StatCard title="Today's Sales" value={`₹${todaySales.toFixed(2)}`} icon={IndianRupee} description="Total revenue from milk sales today" />
+          <StatCard title="Monthly Sales" value={`₹${monthSales.toFixed(2)}`} icon={IndianRupee} description={`Since ${format(firstDayOfMonth, "MMM dd")}`} />
         </div>
     );
 }
