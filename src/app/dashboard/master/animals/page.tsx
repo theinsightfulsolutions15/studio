@@ -618,15 +618,15 @@ export default function AnimalsPage() {
             <ScrollArea className="pr-4 -mr-6">
             <div className="grid gap-6 py-4">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-md bg-muted flex items-center justify-center overflow-hidden">
+                    <div className="w-32 h-32 rounded-md bg-muted flex items-center justify-center overflow-hidden">
                             {capturedImage ? (
                             <Image src={capturedImage} alt="Animal" width={192} height={192} className="object-cover h-full w-full" />
                         ) : (
-                            <Camera className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground" />
+                            <Camera className="h-12 w-12 text-muted-foreground" />
                         )}
                     </div>
                     {dialogMode !== 'view' && (
-                        <div className="w-32 sm:w-48 grid grid-cols-2 gap-2">
+                        <div className="w-full max-w-[200px] grid grid-cols-2 gap-2">
                             <Button variant="outline" onClick={() => setIsCaptureDialogOpen(true)}>
                                 <Camera className="mr-2 h-4 w-4" />
                                 Capture
@@ -815,3 +815,5 @@ export default function AnimalsPage() {
     </>
   );
 }
+
+    
