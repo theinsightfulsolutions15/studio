@@ -12,8 +12,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, collection } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection, query, where } from 'firebase/firestore';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +21,9 @@ import type { User as AppUser, AmcRenewal } from '@/lib/types';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
+import { Skeleton } from '@/components/ui/skeleton';
+import { FileClock } from 'lucide-react';
+import { format } from 'date-fns';
 
 const initialFormState: Omit<AmcRenewal, 'id' | 'userId' | 'userName' | 'submittedAt' | 'status'> = {
     date: new Date().toISOString(),
@@ -44,6 +47,18 @@ export default function RenewalPage() {
     }, [user, firestore]);
     
     const { data: userData, isLoading: isUserDocLoading } = useDoc<AppUser>(userDocRef);
+
+    const pendingRenewalQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return query(
+            collection(firestore, 'amc_renewals'),
+            where('userId', '==', user.uid),
+            where('status', '==', 'Pending')
+        );
+    }, [user, firestore]);
+
+    const { data: pendingRenewals, isLoading: isLoadingRenewals } = useCollection<AmcRenewal>(pendingRenewalQuery);
+    const existingPendingRenewal = pendingRenewals?.[0];
 
     const handleSubmit = async () => {
         if (!user || !userData || !firestore) {
@@ -75,7 +90,7 @@ export default function RenewalPage() {
                 title: 'Submission Successful',
                 description: 'Your AMC renewal request has been submitted for approval.',
             });
-            router.push('/dashboard');
+            // Don't redirect, let the page re-render to show the pending message
         } catch (error) {
             console.error("Error submitting renewal:", error);
             toast({ variant: 'destructive', title: 'Submission Failed', description: 'Could not submit your request. Please try again.' });
@@ -84,7 +99,70 @@ export default function RenewalPage() {
         }
     };
     
-    const isLoading = isUserLoading || isUserDocLoading;
+    const isLoading = isUserLoading || isUserDocLoading || isLoadingRenewals;
+
+    if (isLoading) {
+        return (
+            <div className="flex justify-center items-start pt-10">
+                <Card className="w-full max-w-2xl">
+                    <CardHeader>
+                        <Skeleton className="h-8 w-3/4" />
+                        <Skeleton className="h-4 w-full" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-6">
+                            <Skeleton className="h-10 w-full" />
+                            <Skeleton className="h-10 w-full" />
+                            <Skeleton className="h-10 w-full" />
+                        </div>
+                    </CardContent>
+                    <CardFooter>
+                         <Skeleton className="h-10 w-32 ml-auto" />
+                    </CardFooter>
+                </Card>
+            </div>
+        );
+    }
+    
+    if (existingPendingRenewal) {
+        return (
+             <div className="flex justify-center items-start pt-10">
+                <Card className="w-full max-w-2xl">
+                    <CardHeader className="text-center">
+                        <FileClock className="mx-auto h-12 w-12 text-primary" />
+                        <CardTitle className="mt-4">Request Pending Approval</CardTitle>
+                        <CardDescription>
+                            Your previous AMC renewal request is currently awaiting approval from an administrator.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-sm">
+                        <div className="border rounded-lg p-4 space-y-3 bg-muted/50">
+                             <div className="flex justify-between">
+                                <span className="text-muted-foreground">Submission Date:</span>
+                                <span className="font-medium">{format(existingPendingRenewal.submittedAt.toDate(), 'dd/MM/yyyy')}</span>
+                            </div>
+                             <div className="flex justify-between">
+                                <span className="text-muted-foreground">Amount Paid:</span>
+                                <span className="font-medium">₹{existingPendingRenewal.amount.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Payment Mode:</span>
+                                <span className="font-medium">{existingPendingRenewal.transactionType}</span>
+                            </div>
+                        </div>
+                         <p className="mt-4 text-center text-muted-foreground">
+                            You will be notified once your request has been reviewed. You cannot submit a new request at this time.
+                        </p>
+                    </CardContent>
+                    <CardFooter>
+                        <Button className="w-full sm:w-auto ml-auto" onClick={() => router.push('/dashboard')}>
+                            Back to Dashboard
+                        </Button>
+                    </CardFooter>
+                </Card>
+            </div>
+        )
+    }
 
     return (
         <div className="flex justify-center items-start pt-10">
@@ -152,7 +230,7 @@ export default function RenewalPage() {
                     <Button 
                         className="w-full sm:w-auto ml-auto" 
                         onClick={handleSubmit} 
-                        disabled={isLoading || isSubmitting}
+                        disabled={isSubmitting}
                     >
                        {isSubmitting ? 'Submitting...' : 'Submit for Approval'}
                     </Button>
