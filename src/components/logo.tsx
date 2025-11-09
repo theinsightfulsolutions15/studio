@@ -1,35 +1,55 @@
+
 import type { SVGProps } from 'react';
+
+export default function Logo({ className }: { className?: string }) {
+  return (
+    <div className={`inline-flex items-center justify-center gap-2 font-headline text-2xl font-bold ${className}`}>
+      <CowIcon className="h-10 w-10" />
+      <span>NANDI NET</span>
+    </div>
+  );
+}
 
 const CowIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
+    viewBox="0 0 150 150"
     fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
     {...props}
   >
-    <path d="M18.8 8.01h.01" />
-    <path d="M19.3 2.8A2.5 2.5 0 0 1 22 5.3v10.4a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 6 15.7V5.3A2.5 2.5 0 0 1 8.5 2.8" />
-    <path d="M8 18.2v-1.46a4.75 4.75 0 0 1 4.75-4.75h0a4.75 4.75 0 0 1 4.75 4.75V18.2" />
-    <path d="M8.8 3.5a1.5 1.5 0 0 0-3.3 0" />
-    <path d="M2 13.6a1 1 0 0 0 1 1h2" />
+    <path
+      d="M87.358 45.474c-2.022-2.31-4.83-4.14-8.07-5.223-3.24-1.082-6.8-1.378-10.32-.823-6.54.912-12.18 4.38-15.9 9.48-1.574 2.1-2.736 4.473-3.425 7.02-.725 2.641-.967 5.432-.69 8.223.277 2.79.998 5.498 2.138 8.043.967 2.1 2.334 4.14 4.085 5.973 1.751 1.833 3.845 3.425 6.18 4.654 4.71 2.49 10.034 3.75 15.6 3.75 6.42 0 12.48-1.748 17.64-5.01 2.94-1.833 5.46-4.14 7.41-6.843.9-1.236 1.62-2.58 2.16-3.992.54-1.413.9-2.88.99-4.382.18-3.06-.36-6.06-1.53-8.76-1.2-2.76-3.09-5.16-5.52-7.02z"
+      fill="currentColor"
+      className="text-primary"
+    />
+    <path
+      d="M102.778 35.04c1.178-3.327 1.178-6.933 0-10.32-1.179-3.387-3.48-6.23-6.48-8.1-2.94-1.833-6.42-2.76-10.02-2.76-4.26 0-8.34 1.236-11.88 3.573-2.61 1.748-4.86 4.02-6.66 6.66-1.8 2.7-3.09 5.76-3.87 9-3.42-3.12-6.06-6.9-7.8-11.16-1.74-4.2-2.52-8.82-2.28-13.38.33-4.56 1.71-8.94 4.02-12.9 2.31-3.96 5.52-7.38 9.42-9.96C71.398 3.52 76.738 2 82.258 2c5.94 0 11.7 1.8 16.56 5.04 4.86 3.24 8.64 7.92 10.86 13.56 1.05 2.7.15 5.76-1.8 7.8-1.95 2.1-4.86 2.88-7.62 1.98a23.01 23.01 0 00-7.23-1.32z"
+      fill="currentColor"
+      className="text-primary"
+    />
+    <path
+      d="M48.238 67.594c-5.88-2.433-11.01-6.09-14.94-10.65-3.93-4.56-6.6-9.96-7.8-15.72-1.14-5.76-.78-11.79 1.02-17.43 1.8-5.64 5.04-10.77 9.42-14.91 4.38-4.14 9.81-7.23 15.75-8.97M56.818 100.234c-11.25-2.433-21.36-8.52-28.86-17.31-7.5-8.79-12.03-20.01-12.87-31.95"
+      stroke="currentColor"
+      className="text-primary"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
+    <path
+      d="M74.878 12.034c2.4-3.18 5.7-5.46 9.6-6.6M39.118 78.454c-.6 3.96.15 7.98 1.95 11.49 1.8 3.51 4.65 6.42 8.19 8.4 3.54 1.98 7.62 2.94 11.76 2.82 7.8-.21 14.88-3.33 20.13-8.58 5.25-5.25 8.52-12.3 9.09-19.89.3-3.9-.3-7.8-1.74-11.28"
+      stroke="currentColor"
+      className="text-primary"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
+    <path
+      d="M76.978 78.514c.33-2.22.33-4.47 0-6.69a19.006 19.006 0 00-2.43-6.15c-1.2-1.92-2.73-3.6-4.53-4.98-1.8-1.38-3.84-2.46-6-3.21m-14.82-3.12c-2.43.48-4.77 1.35-6.93 2.58a18.42 18.42 0 00-5.85 4.68c-1.83 2.01-3.3 4.35-4.32 6.93-.99 2.58-1.53 5.34-1.59 8.16M66.418 84.094a4.2 4.2 0 100-8.4 4.2 4.2 0 000 8.4z"
+      fill="currentColor"
+      className="text-primary"
+    />
+     <path
+      d="M87.358 84.094a4.2 4.2 0 100-8.4 4.2 4.2 0 000 8.4zM76.888 92.494a4.2 4.2 0 100-8.4 4.2 4.2 0 000 8.4z"
+      fill="currentColor"
+      className="text-primary"
+    />
   </svg>
 );
-
-export default function Logo() {
-  return (
-    <div className="flex items-center justify-center gap-2 text-primary">
-      <div className="rounded-lg bg-primary/10 p-2">
-        <CowIcon className="h-6 w-6" />
-      </div>
-      <span className="text-xl font-bold font-headline text-foreground">
-        NANDI NET
-      </span>
-    </div>
-  );
-}

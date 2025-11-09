@@ -92,8 +92,8 @@ export default function LoginPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
-          <p className="text-lg font-semibold">NANDI NET</p>
-          <p className="text-muted-foreground">Loading, please wait...</p>
+          <Logo />
+          <p className="text-muted-foreground mt-2">Loading, please wait...</p>
         </div>
       </div>
     );
