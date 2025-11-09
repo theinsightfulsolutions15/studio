@@ -218,13 +218,14 @@ export default function SettingsPage() {
 
             const cleanedUsers = cleanDataForExport(allUsersToBackup, ['photoURL']);
             const usersSheet = XLSX.utils.json_to_sheet(cleanedUsers);
-            XLSX.utils.book_append_sheet(workbook, usersSheet, 'All User Profiles');
+            XLSX.utils.book_append_sheet(workbook, usersSheet, 'All_User_Profiles');
 
             for (const u of allUsersToBackup) {
                 const userDataToBackup = await fetchDataForUser(u.id);
                 for (const [colName, data] of Object.entries(userDataToBackup)) {
                     if(data.length > 0) {
-                      const sheetName = `${u.customerId || u.id.substring(0,5)}_${colName}`.substring(0, 31);
+                      const safeUserName = (u.name || u.id.substring(0,5)).replace(/[^a-zA-Z0-9]/g, '_');
+                      const sheetName = `${safeUserName}_${colName}`.substring(0, 31);
                       let cleanedData = data;
                       if(colName === 'animals'){
                           cleanedData = cleanDataForExport(data, ['imageUrl']);
@@ -293,25 +294,25 @@ export default function SettingsPage() {
             try {
                 const data = e.target?.result;
                 const workbook = XLSX.read(data, { type: 'array' });
-                const batch = writeBatch(firestore);
     
                 if (restoreMode === 'full') {
+                    const batch = writeBatch(firestore);
                     // Full Restore Logic: Iterate through all sheets
                     for (const sheetName of workbook.SheetNames) {
                         const worksheet = workbook.Sheets[sheetName];
                         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
     
-                        if (sheetName === 'All User Profiles') {
+                        if (sheetName === 'All_User_Profiles') {
                             for (const record of jsonData) {
                                 const docRef = doc(firestore, 'users', record.id);
                                 batch.set(docRef, record);
                             }
                         } else {
-                            const [userIdentifier, ...collectionParts] = sheetName.split('_');
-                            const collectionName = collectionParts.join('_');
+                            const parts = sheetName.split('_');
+                            const userName = parts.slice(0, -1).join('_');
+                            const collectionName = parts.slice(-1)[0];
                             
-                            // Find the user by customerId or a substring of their UID
-                            const user = allUsers?.find(u => u.customerId === userIdentifier || u.id.substring(0, 5) === userIdentifier);
+                            const user = allUsers?.find(u => (u.name || u.id.substring(0,5)).replace(/[^a-zA-Z0-9]/g, '_') === userName);
     
                             if (user) {
                                 for (const record of jsonData) {
@@ -323,20 +324,22 @@ export default function SettingsPage() {
                             }
                         }
                     }
+                    await batch.commit();
                     toast({ title: 'Full Restore Successful', description: 'All data has been restored from the backup.' });
+
                 } else if (restoreMode === 'user' && selectedUserId) {
+                    const batch = writeBatch(firestore);
                     // User-wise Restore Logic
                     const selectedUser = allUsers?.find(u => u.id === selectedUserId);
                     if (!selectedUser) {
                         throw new Error('Selected user not found.');
                     }
-                    const userIdentifier = selectedUser.customerId || selectedUser.id.substring(0, 5);
+                    const safeUserName = (selectedUser.name || selectedUser.id.substring(0,5)).replace(/[^a-zA-Z0-9]/g, '_');
     
                     // Iterate through sheets and only process those belonging to the selected user
                     for (const sheetName of workbook.SheetNames) {
-                        if (sheetName.startsWith(userIdentifier)) {
-                            const [, ...collectionParts] = sheetName.split('_');
-                            const collectionName = collectionParts.join('_');
+                        if (sheetName.startsWith(safeUserName)) {
+                            const collectionName = sheetName.substring(safeUserName.length + 1);
                             const worksheet = workbook.Sheets[sheetName];
                             const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
     
@@ -348,10 +351,9 @@ export default function SettingsPage() {
                             }
                         }
                     }
+                    await batch.commit();
                     toast({ title: 'User Restore Successful', description: `Data for ${selectedUser.name} has been restored.` });
                 }
-    
-                await batch.commit();
     
             } catch (error) {
                 console.error("Restore error:", error);
@@ -636,3 +638,5 @@ export default function SettingsPage() {
     </>
   );
 }
+
+    
