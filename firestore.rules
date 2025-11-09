@@ -118,10 +118,10 @@ service cloud.firestore {
     match /support_tickets/{ticketId} {
       // A user can create a ticket for themselves.
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      // A user can read their own tickets.
-      allow get, list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // A user can read their own tickets by querying for their userId.
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
       // An admin can manage all tickets.
-      allow read, write, delete, list: if isAdmin();
+      allow read, write, list: if isAdmin();
     }
 
     /**
@@ -156,5 +156,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
