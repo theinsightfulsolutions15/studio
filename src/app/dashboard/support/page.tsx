@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, query, where, serverTimestamp } from 'firebase/firestore';
+import { doc, collection, query, where } from 'firebase/firestore';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useState, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -90,18 +90,21 @@ export default function SupportPage() {
     }
 
     setIsSubmitting(true);
-    const ticketData: Omit<SupportTicket, 'id' | 'status' | 'submittedAt'> = {
+    const ticketData: Omit<SupportTicket, 'id'> = {
       userId: user.uid,
       userName: userData.name,
       userEmail: userData.email,
       customerId: userData.customerId,
       subject: formData.subject,
       description: formData.description,
+      status: 'Open',
+      submittedAt: new Date(),
+      closedAt: null,
     };
 
     try {
       const ticketsColRef = collection(firestore, 'support_tickets');
-      await addDocumentNonBlocking(ticketsColRef, { ...ticketData, submittedAt: serverTimestamp(), status: 'Open' });
+      await addDocumentNonBlocking(ticketsColRef, ticketData);
       toast({
         title: 'Request Submitted',
         description: 'Your support ticket has been sent. We will get back to you shortly.',
@@ -171,9 +174,9 @@ export default function SupportPage() {
                         <Button 
                             className="w-full sm:w-auto" 
                             onClick={handleSubmit} 
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || isLoading}
                         >
-                        {isSubmitting ? 'Submitting...' : 'Submit Request'}
+                        {isSubmitting || isLoading ? 'Submitting...' : 'Submit Request'}
                         </Button>
                     </div>
                 )}
