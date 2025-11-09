@@ -26,15 +26,16 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Search } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, query as firestoreQuery, collectionGroup } from 'firebase/firestore';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { SupportTicket } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { format, subDays } from 'date-fns';
+import { Input } from '@/components/ui/input';
 
 function TicketRowSkeleton() {
   return (
@@ -52,28 +53,42 @@ export default function SupportTicketsPage() {
   const { isAdmin, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const ticketsQuery = useMemoFirebase(() => {
     if (!isAdmin || !firestore) return null;
-    return collection(firestore, 'support_tickets');
+    return firestoreQuery(collectionGroup(firestore, 'support_tickets'));
   }, [isAdmin, firestore]);
 
   const { data: allTickets, isLoading: isLoadingTickets } = useCollection<SupportTicket>(ticketsQuery);
 
+  const filteredTickets = useMemo(() => {
+    if (!allTickets) return [];
+    if (!searchTerm) return allTickets;
+
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return allTickets.filter(ticket => 
+        ticket.userName?.toLowerCase().includes(lowercasedTerm) ||
+        ticket.userEmail?.toLowerCase().includes(lowercasedTerm) ||
+        ticket.subject?.toLowerCase().includes(lowercasedTerm) ||
+        ticket.customerId?.toLowerCase().includes(lowercasedTerm)
+    );
+  }, [allTickets, searchTerm]);
+
   const openTickets = useMemo(() => {
-      return allTickets?.filter(t => t.status === 'Open').sort((a,b) => b.submittedAt.toDate() - a.submittedAt.toDate()) || [];
-    }, [allTickets]);
+      return filteredTickets?.filter(t => t.status === 'Open').sort((a,b) => b.submittedAt.toDate() - a.submittedAt.toDate()) || [];
+    }, [filteredTickets]);
 
   const closedTickets = useMemo(() => {
-    if (!allTickets) return [];
+    if (!filteredTickets) return [];
     const fifteenDaysAgo = subDays(new Date(), 15);
-    return allTickets.filter(ticket => {
+    return filteredTickets.filter(ticket => {
         if (ticket.status === 'Closed' && ticket.closedAt) {
             return ticket.closedAt.toDate() > fifteenDaysAgo;
         }
         return false;
     }).sort((a,b) => b.closedAt.toDate() - a.closedAt.toDate());
-  }, [allTickets]);
+  }, [filteredTickets]);
 
 
   const handleUpdateStatus = async (ticket: SupportTicket, status: 'Open' | 'Closed') => {
@@ -122,13 +137,22 @@ export default function SupportTicketsPage() {
 
   return (
     <Tabs defaultValue="open">
-      <div className="flex items-center">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <TabsList>
           <TabsTrigger value="open">Open</TabsTrigger>
           <TabsTrigger value="closed">Recently Closed</TabsTrigger>
         </TabsList>
+        <div className="relative w-full md:w-auto md:max-w-xs">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search tickets..."
+            className="pl-8"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
-      <TabsContent value="open">
+      <TabsContent value="open" className="mt-4">
         <Card>
           <CardHeader>
             <CardTitle>Open Support Tickets</CardTitle>
@@ -148,7 +172,7 @@ export default function SupportTicketsPage() {
           </CardFooter>
         </Card>
       </TabsContent>
-      <TabsContent value="closed">
+      <TabsContent value="closed" className="mt-4">
         <Card>
           <CardHeader>
             <CardTitle>Recently Closed Support Tickets</CardTitle>
