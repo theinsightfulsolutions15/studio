@@ -29,7 +29,7 @@ import {
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Download, Camera, Upload, DatabaseBackup, Power } from 'lucide-react';
+import { Download, Camera, Upload, DatabaseBackup, Power, Image as ImageIcon } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection, useFirebase } from '@/firebase';
 import { doc, collection, getDocs, query, writeBatch, documentId, where, setDoc } from 'firebase/firestore';
@@ -39,7 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import type { User as AppUser, Animal, AnimalMovement, FinancialRecord, MilkRecord, Account } from '@/lib/types';
+import type { User as AppUser, Animal, AnimalMovement, FinancialRecord, MilkRecord, Account, SystemConfig } from '@/lib/types';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -47,6 +47,112 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
+import Image from 'next/image';
+
+
+function BrandingSettings() {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [newLogo, setNewLogo] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const logoUploadRef = useRef<HTMLInputElement>(null);
+
+    const configDocRef = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return doc(firestore, 'system', 'config');
+    }, [firestore]);
+
+    const { data: systemConfig, isLoading: isLoadingConfig } = useDoc<SystemConfig>(configDocRef);
+
+    const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            if (file.size > 512 * 1024) { // 512KB limit
+                toast({
+                    variant: 'destructive',
+                    title: 'File Too Large',
+                    description: 'Please upload an image smaller than 512KB.'
+                });
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const dataUri = e.target?.result as string;
+                setNewLogo(dataUri);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleSaveLogo = async () => {
+        if (!configDocRef || !newLogo) return;
+        setIsSaving(true);
+        try {
+            await setDocumentNonBlocking(configDocRef, { appLogo: newLogo }, { merge: true });
+            toast({
+                title: 'Success',
+                description: 'Application logo has been updated.'
+            });
+            setNewLogo(null);
+        } catch (error) {
+            console.error("Error saving logo:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to save the new logo.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const currentLogoSrc = newLogo || systemConfig?.appLogo;
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Branding</CardTitle>
+                <CardDescription>Customize the application's logo.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="space-y-2">
+                    <Label>Application Logo</Label>
+                    <div className="flex flex-col sm:flex-row items-center gap-6">
+                        <div className="w-32 h-32 rounded-lg border bg-muted flex items-center justify-center p-2">
+                            {isLoadingConfig ? <Skeleton className="h-full w-full" /> :
+                                currentLogoSrc ? (
+                                    <Image src={currentLogoSrc} alt="Current Logo" width={100} height={100} className="object-contain h-full w-full" />
+                                ) : (
+                                    <div className="text-center text-muted-foreground text-sm">No Logo Set</div>
+                                )
+                            }
+                        </div>
+                        <div className="flex-1 space-y-4">
+                            <p className="text-sm text-muted-foreground">
+                                Upload a new logo. For best results, use a square image (PNG or JPG) under 512KB.
+                            </p>
+                            <input
+                                type="file"
+                                ref={logoUploadRef}
+                                onChange={handleLogoUpload}
+                                className="hidden"
+                                accept="image/png, image/jpeg"
+                            />
+                            <div className="flex gap-2">
+                                <Button variant="outline" onClick={() => logoUploadRef.current?.click()}>
+                                    <Upload className="mr-2 h-4 w-4" />
+                                    Upload Logo
+                                </Button>
+                                {newLogo && (
+                                    <Button onClick={handleSaveLogo} disabled={isSaving}>
+                                        {isSaving ? <Spinner /> : null}
+                                        Save Logo
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
 
 
 export default function SettingsPage() {
@@ -492,6 +598,8 @@ export default function SettingsPage() {
                 <Button onClick={handleProfileSave} disabled={isLoading}>Save Changes</Button>
             </CardContent>
         </Card>
+
+        {isAdmin && <BrandingSettings />}
 
         <Card>
             <CardHeader>

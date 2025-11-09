@@ -1,4 +1,5 @@
 
+
 import type { LucideIcon } from "lucide-react";
 
 export type Animal = {
@@ -103,4 +104,8 @@ export type Account = {
 
 export type SystemStatus = {
     isMaintenanceMode: boolean;
+};
+
+export type SystemConfig = {
+    appLogo?: string;
 };
